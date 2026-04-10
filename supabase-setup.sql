@@ -17,8 +17,16 @@ create table if not exists public.game_sessions (
   session_id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '3 minutes'),
-  consumed boolean not null default false
+  consumed boolean not null default false,
+  hits_count integer not null default 0,
+  last_hit_at timestamptz
 );
+
+alter table public.game_sessions
+  add column if not exists hits_count integer not null default 0;
+
+alter table public.game_sessions
+  add column if not exists last_hit_at timestamptz;
 
 alter table public.game_sessions enable row level security;
 
@@ -64,8 +72,7 @@ create or replace function public.submit_score(
   p_email_hash text,
   p_display_name text,
   p_full_name text,
-  p_email text,
-  p_score integer
+  p_email text
 )
 returns void
 language plpgsql
@@ -76,8 +83,10 @@ declare
   v_created_at timestamptz;
   v_expires_at timestamptz;
   v_consumed boolean;
+  v_hits_count integer;
   v_elapsed_seconds numeric;
   v_max_allowed_score integer;
+  v_server_score integer;
 begin
   if p_session_id is null then
     raise exception 'game session missing or expired';
@@ -94,12 +103,8 @@ begin
   if p_email is null or length(trim(p_email)) = 0 then
     raise exception 'email required';
   end if;
-  if p_score is null or p_score < 0 then
-    raise exception 'score must be >= 0';
-  end if;
-
-  select created_at, expires_at, consumed
-    into v_created_at, v_expires_at, v_consumed
+  select created_at, expires_at, consumed, hits_count
+    into v_created_at, v_expires_at, v_consumed, v_hits_count
   from public.game_sessions
   where session_id = p_session_id
   for update;
@@ -109,9 +114,10 @@ begin
   end if;
 
   v_elapsed_seconds := greatest(1, extract(epoch from (now() - v_created_at)));
-  v_max_allowed_score := floor((v_elapsed_seconds * 5.0) + 5);
+  v_max_allowed_score := floor((v_elapsed_seconds * 4.0) + 4);
+  v_server_score := greatest(0, v_hits_count);
 
-  if p_score > v_max_allowed_score then
+  if v_server_score > v_max_allowed_score then
     raise exception 'score exceeds allowed pace';
   end if;
 
@@ -120,13 +126,56 @@ begin
   where session_id = p_session_id;
 
   insert into public.leaderboard (email_hash, display_name, full_name, email, score, updated_at)
-  values (p_email_hash, p_display_name, p_full_name, p_email, p_score, now())
+  values (p_email_hash, p_display_name, p_full_name, p_email, v_server_score, now())
   on conflict (email_hash) do update
     set display_name = excluded.display_name,
         full_name = excluded.full_name,
         email = excluded.email,
         score = greatest(public.leaderboard.score, excluded.score),
         updated_at = now();
+end;
+$$;
+
+create or replace function public.register_hit(
+  p_session_id uuid
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_created_at timestamptz;
+  v_expires_at timestamptz;
+  v_consumed boolean;
+  v_last_hit_at timestamptz;
+  v_hits_count integer;
+begin
+  if p_session_id is null then
+    raise exception 'game session missing or expired';
+  end if;
+
+  select created_at, expires_at, consumed, last_hit_at, hits_count
+    into v_created_at, v_expires_at, v_consumed, v_last_hit_at, v_hits_count
+  from public.game_sessions
+  where session_id = p_session_id
+  for update;
+
+  if not found or v_consumed or now() > v_expires_at then
+    raise exception 'game session missing or expired';
+  end if;
+
+  if v_last_hit_at is not null and now() - v_last_hit_at < interval '120 milliseconds' then
+    raise exception 'hit rate too high';
+  end if;
+
+  update public.game_sessions
+  set hits_count = hits_count + 1,
+      last_hit_at = now()
+  where session_id = p_session_id
+  returning hits_count into v_hits_count;
+
+  return v_hits_count;
 end;
 $$;
 
@@ -152,5 +201,6 @@ end;
 $$;
 
 grant execute on function public.create_game_session() to anon, authenticated;
-grant execute on function public.submit_score(uuid, text, text, text, text, integer) to anon, authenticated;
+grant execute on function public.register_hit(uuid) to anon, authenticated;
+grant execute on function public.submit_score(uuid, text, text, text, text) to anon, authenticated;
 grant execute on function public.delete_highscore_entry(text) to authenticated;

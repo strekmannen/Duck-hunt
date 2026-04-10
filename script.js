@@ -24,6 +24,7 @@ const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const SESSION_CREATE_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/create_game_session`;
+const REGISTER_HIT_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/register_hit`;
 
 const duck = {
   x: 240,
@@ -163,7 +164,34 @@ async function loadAndRenderHighscores(options = {}) {
   }
 }
 
-async function saveScoreForCurrentPlayer(finalScore) {
+async function registerHitForCurrentSession() {
+  if (!currentGameSessionId) {
+    throw new Error("game session missing or expired");
+  }
+  const response = await fetch(REGISTER_HIT_ENDPOINT, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      p_session_id: currentGameSessionId
+    })
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`register_hit failed: ${details}`);
+  }
+  const payload = await response.json();
+  if (typeof payload === "number") return payload;
+  if (payload && typeof payload === "object" && typeof payload.register_hit === "number") {
+    return payload.register_hit;
+  }
+  throw new Error("register_hit returned unexpected payload");
+}
+
+async function saveScoreForCurrentPlayer() {
   const firstName = (playerFirstNameEl.value || "").trim();
   const lastName = (playerLastNameEl.value || "").trim();
   const fullName = `${firstName} ${lastName}`.trim();
@@ -192,8 +220,7 @@ async function saveScoreForCurrentPlayer(finalScore) {
           p_email_hash: emailHash,
           p_display_name: displayName,
           p_full_name: fullName,
-          p_email: email,
-          p_score: finalScore
+          p_email: email
         })
       });
       if (!response.ok) {
@@ -282,20 +309,32 @@ function handleDuckHit() {
   if (squishTimeoutId) clearTimeout(squishTimeoutId);
 
   const thisRound = roundId;
-  score += 1;
-  duck.speed += DUCK_SPEED_STEP;
-  duck.state = "flat";
-  messageEl.textContent = "SQUICH! Anda ble flat!";
-  render();
+  registerHitForCurrentSession()
+    .then((serverScore) => {
+      score = serverScore;
+      duck.speed += DUCK_SPEED_STEP;
+      duck.state = "flat";
+      messageEl.textContent = "SQUICH! Anda ble flat!";
+      render();
 
-  squishTimeoutId = setTimeout(() => {
-    if (!running || thisRound !== roundId) return;
-    duck.state = "whole";
-    placeDuck();
-    setDuckVelocity(duck.speed);
-    messageEl.textContent = "Ny and i farta!";
-    render();
-  }, SQUISH_DELAY_MS);
+      squishTimeoutId = setTimeout(() => {
+        if (!running || thisRound !== roundId) return;
+        duck.state = "whole";
+        placeDuck();
+        setDuckVelocity(duck.speed);
+        messageEl.textContent = "Ny and i farta!";
+        render();
+      }, SQUISH_DELAY_MS);
+    })
+    .catch((error) => {
+      console.warn("Hit rejected by anti-cheat.", error);
+      const msg = String(error.message || "");
+      if (msg.includes("hit rate too high")) {
+        messageEl.textContent = "Treff avvist: for rask treff-rate.";
+        return;
+      }
+      messageEl.textContent = "Treff avvist av anti-cheat-kontroll.";
+    });
 }
 
 function handleMiss() {
@@ -379,7 +418,7 @@ async function handleScoreSubmit() {
     return;
   }
   savePlayerProfile();
-  const result = await saveScoreForCurrentPlayer(lastFinishedScore);
+  const result = await saveScoreForCurrentPlayer();
   if (!result.saved) {
     if (result.reason === "missing_session") {
       messageEl.textContent = "Runden mangler gyldig spilltoken. Start ny runde og prøv igjen.";
