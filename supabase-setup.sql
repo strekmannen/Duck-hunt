@@ -114,7 +114,7 @@ begin
   end if;
 
   v_elapsed_seconds := greatest(1, extract(epoch from (now() - v_created_at)));
-  v_max_allowed_score := floor((v_elapsed_seconds * 4.0) + 4);
+  v_max_allowed_score := floor((v_elapsed_seconds / 0.8) + 2);
   v_server_score := greatest(0, v_hits_count);
 
   if v_server_score > v_max_allowed_score then
@@ -150,6 +150,8 @@ declare
   v_consumed boolean;
   v_last_hit_at timestamptz;
   v_hits_count integer;
+  v_elapsed_seconds numeric;
+  v_max_hits_allowed integer;
 begin
   if p_session_id is null then
     raise exception 'game session missing or expired';
@@ -165,8 +167,14 @@ begin
     raise exception 'game session missing or expired';
   end if;
 
-  if v_last_hit_at is not null and now() - v_last_hit_at < interval '120 milliseconds' then
+  if v_last_hit_at is not null and now() - v_last_hit_at < interval '700 milliseconds' then
     raise exception 'hit rate too high';
+  end if;
+
+  v_elapsed_seconds := greatest(1, extract(epoch from (now() - v_created_at)));
+  v_max_hits_allowed := floor((v_elapsed_seconds / 0.8) + 2);
+  if v_hits_count + 1 > v_max_hits_allowed then
+    raise exception 'hit count exceeds elapsed time';
   end if;
 
   update public.game_sessions
