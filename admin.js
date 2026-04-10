@@ -7,6 +7,7 @@ const adminPanelEl = document.getElementById("adminPanel");
 const adminEmailEl = document.getElementById("adminEmail");
 const adminPasswordEl = document.getElementById("adminPassword");
 const loginBtn = document.getElementById("loginBtn");
+const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const adminMessageEl = document.getElementById("adminMessage");
 const adminHighscoreListEl = document.getElementById("adminHighscoreList");
@@ -67,6 +68,23 @@ async function login() {
   await loadAdminHighscores();
 }
 
+async function forgotPassword() {
+  const email = (adminEmailEl.value || "").trim();
+  if (!email) {
+    adminMessageEl.textContent = "Skriv inn e-post først for å motta reset-lenke.";
+    return;
+  }
+
+  const redirectTo = `${window.location.origin}/admin`;
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) {
+    adminMessageEl.textContent = `Kunne ikke sende reset-link: ${error.message}`;
+    return;
+  }
+
+  adminMessageEl.textContent = "Reset-lenke sendt til e-postadressen din.";
+}
+
 async function logout() {
   await supabaseClient.auth.signOut();
   setLoggedInUi(false);
@@ -86,5 +104,6 @@ async function init() {
 }
 
 loginBtn.addEventListener("click", login);
+forgotPasswordBtn.addEventListener("click", forgotPassword);
 logoutBtn.addEventListener("click", logout);
 init();
