@@ -9,7 +9,6 @@ const lifeIcons = Array.from(document.querySelectorAll(".life-icon"));
 const playerFirstNameEl = document.getElementById("playerFirstName");
 const playerLastNameEl = document.getElementById("playerLastName");
 const playerEmailEl = document.getElementById("playerEmail");
-const submitScoreBtn = document.getElementById("submitScoreBtn");
 const highscoreListEl = document.getElementById("highscoreList");
 
 // Fill these from your Supabase project settings.
@@ -40,7 +39,6 @@ let lives = START_LIVES;
 let running = true;
 let roundId = 0;
 let squishTimeoutId = null;
-let lastFinishedScore = null;
 let currentGameSessionId = null;
 
 function isSupabaseConfigured() {
@@ -305,9 +303,27 @@ function render() {
 function endGame() {
   running = false;
   const finalScore = score;
-  lastFinishedScore = finalScore;
-  messageEl.textContent = `Game over! Du knuste ${finalScore} and(er).`;
-  messageEl.textContent = `Game over! Du knuste ${finalScore} and(er). Trykk "Send inn resultat" for highscore.`;
+  if (!areProfileFieldsValid()) {
+    messageEl.textContent = `Game over! Du knuste ${finalScore} and(er). Fyll inn fornavn, etternavn og e-post for highscore.`;
+    return;
+  }
+
+  savePlayerProfile();
+  saveScoreForCurrentPlayer().then((result) => {
+    if (!result.saved) {
+      if (result.reason === "missing_session") {
+        messageEl.textContent = "Resultat ble ikke lagret: spilltoken mangler/utlopt.";
+        return;
+      }
+      if (result.reason === "score_rejected") {
+        messageEl.textContent = "Resultatet ble avvist av anti-cheat-kontroll.";
+        return;
+      }
+      messageEl.textContent = "Resultatet kunne ikke lagres akkurat nå. Prøv igjen neste runde.";
+      return;
+    }
+    messageEl.textContent = `Game over! Du knuste ${finalScore} and(er). Resultat lagret i highscore.`;
+  });
 }
 
 function handleDuckHit() {
@@ -400,7 +416,6 @@ function startGame() {
   score = 0;
   lives = START_LIVES;
   running = true;
-  lastFinishedScore = null;
   currentGameSessionId = null;
   duck.speed = DUCK_START_SPEED;
   duck.state = "whole";
@@ -419,44 +434,6 @@ function startGame() {
         console.warn("Could not create anti-cheat game session.", error);
       });
   }
-}
-
-async function handleScoreSubmit() {
-  if (!areProfileFieldsValid()) {
-    playerFirstNameEl.reportValidity();
-    playerLastNameEl.reportValidity();
-    playerEmailEl.reportValidity();
-    messageEl.textContent = "Alle felt er obligatoriske: fornavn, etternavn og gyldig e-post.";
-    return;
-  }
-
-  if (lastFinishedScore === null) {
-    messageEl.textContent = "Spill ferdig en runde for å sende inn resultat.";
-    return;
-  }
-  savePlayerProfile();
-  const result = await saveScoreForCurrentPlayer();
-  if (!result.saved) {
-    if (result.reason === "missing_session") {
-      messageEl.textContent = "Runden mangler gyldig spilltoken. Start ny runde og prøv igjen.";
-      return;
-    }
-    if (result.reason === "score_rejected") {
-      messageEl.textContent = "Resultatet ble avvist av anti-cheat-kontroll.";
-      return;
-    }
-    if (result.reason === "global_not_configured") {
-      messageEl.textContent = "Global highscore er ikke konfigurert.";
-      return;
-    }
-    if (result.reason === "global_save_failed") {
-      messageEl.textContent = "Kunne ikke sende til global highscore akkurat nå. Prøv igjen.";
-      return;
-    }
-    messageEl.textContent = "Alle felt er obligatoriske: fornavn, etternavn og gyldig e-post.";
-    return;
-  }
-  messageEl.textContent = `Resultat ${lastFinishedScore} sendt inn til global highscore.`;
 }
 
 duckEl.addEventListener("pointerdown", (event) => {
@@ -482,7 +459,6 @@ restartBtn.addEventListener("click", startGame);
 highscoreBtn.addEventListener("click", () => {
   highscorePanelEl.scrollIntoView({ behavior: "smooth", block: "start" });
 });
-submitScoreBtn.addEventListener("click", handleScoreSubmit);
 playerFirstNameEl.addEventListener("input", savePlayerProfile);
 playerLastNameEl.addEventListener("input", savePlayerProfile);
 playerEmailEl.addEventListener("input", savePlayerProfile);
