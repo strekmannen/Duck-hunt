@@ -5,7 +5,6 @@ const messageEl = document.getElementById("message");
 const restartBtn = document.getElementById("restartBtn");
 const highscoreBtn = document.getElementById("highscoreBtn");
 const highscorePanelEl = document.getElementById("highscorePanel");
-const highscoreModeInfoEl = document.getElementById("highscoreModeInfo");
 const lifeIcons = Array.from(document.querySelectorAll(".life-icon"));
 const playerFirstNameEl = document.getElementById("playerFirstName");
 const playerLastNameEl = document.getElementById("playerLastName");
@@ -24,6 +23,7 @@ const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
+const SESSION_CREATE_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/create_game_session`;
 
 const duck = {
   x: 240,
@@ -40,6 +40,7 @@ let running = true;
 let roundId = 0;
 let squishTimeoutId = null;
 let lastFinishedScore = null;
+let currentGameSessionId = null;
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -126,24 +127,40 @@ async function fetchGlobalHighscores() {
   return response.json();
 }
 
+async function createGameSession() {
+  if (!isSupabaseConfigured()) return null;
+  const response = await fetch(SESSION_CREATE_ENDPOINT, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({})
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`create_game_session failed: ${details}`);
+  }
+  const payload = await response.json();
+  if (typeof payload === "string" && payload.length > 10) return payload;
+  if (payload && typeof payload === "object" && typeof payload.session_id === "string") {
+    return payload.session_id;
+  }
+  throw new Error("create_game_session returned unexpected payload");
+}
+
 async function loadAndRenderHighscores(options = {}) {
   if (!isSupabaseConfigured()) {
     highscoreListEl.innerHTML = "<li>Global highscore er ikke konfigurert.</li>";
-    updateHighscoreModeText("global");
     return;
   }
   try {
     const items = await fetchGlobalHighscores();
     renderHighscoreItems(items);
-    updateHighscoreModeText("global");
   } catch {
     highscoreListEl.innerHTML = "<li>Kunne ikke hente global highscore akkurat nå.</li>";
-    updateHighscoreModeText("global");
   }
-}
-
-function updateHighscoreModeText(scope) {
-  highscoreModeInfoEl.textContent = `Vanlig visning (${scope}): fornavn + etternavn initial. Admin-side: /admin`;
 }
 
 async function saveScoreForCurrentPlayer(finalScore) {
@@ -156,6 +173,7 @@ async function saveScoreForCurrentPlayer(finalScore) {
     lastName.length > 0 &&
     isValidEmail(email);
   if (!isValid) return { saved: false, reason: "missing_profile" };
+  if (!currentGameSessionId) return { saved: false, reason: "missing_session" };
 
   const displayName = toDisplayName(firstName, lastName);
 
@@ -170,6 +188,7 @@ async function saveScoreForCurrentPlayer(finalScore) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          p_session_id: currentGameSessionId,
           p_email_hash: emailHash,
           p_display_name: displayName,
           p_full_name: fullName,
@@ -185,6 +204,13 @@ async function saveScoreForCurrentPlayer(finalScore) {
       return { saved: true, scope: "global" };
     } catch (error) {
       console.warn("Global score save failed.", error);
+      const msg = String(error.message || "");
+      if (msg.includes("score exceeds allowed pace")) {
+        return { saved: false, reason: "score_rejected" };
+      }
+      if (msg.includes("game session missing or expired")) {
+        return { saved: false, reason: "missing_session" };
+      }
       return { saved: false, reason: "global_save_failed" };
     }
   }
@@ -319,6 +345,7 @@ function startGame() {
   lives = START_LIVES;
   running = true;
   lastFinishedScore = null;
+  currentGameSessionId = null;
   duck.speed = DUCK_START_SPEED;
   duck.state = "whole";
   placeDuck();
@@ -326,6 +353,16 @@ function startGame() {
   messageEl.textContent = "Trykk rett på anda for å knuse!";
   render();
   requestAnimationFrame(tick);
+
+  if (isSupabaseConfigured()) {
+    createGameSession()
+      .then((sessionId) => {
+        currentGameSessionId = sessionId;
+      })
+      .catch((error) => {
+        console.warn("Could not create anti-cheat game session.", error);
+      });
+  }
 }
 
 async function handleScoreSubmit() {
@@ -344,6 +381,14 @@ async function handleScoreSubmit() {
   savePlayerProfile();
   const result = await saveScoreForCurrentPlayer(lastFinishedScore);
   if (!result.saved) {
+    if (result.reason === "missing_session") {
+      messageEl.textContent = "Runden mangler gyldig spilltoken. Start ny runde og prøv igjen.";
+      return;
+    }
+    if (result.reason === "score_rejected") {
+      messageEl.textContent = "Resultatet ble avvist av anti-cheat-kontroll.";
+      return;
+    }
     if (result.reason === "global_not_configured") {
       messageEl.textContent = "Global highscore er ikke konfigurert.";
       return;

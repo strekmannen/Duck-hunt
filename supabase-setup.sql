@@ -13,6 +13,15 @@ alter table public.leaderboard
 alter table public.leaderboard
   add column if not exists email text not null default '';
 
+create table if not exists public.game_sessions (
+  session_id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '3 minutes'),
+  consumed boolean not null default false
+);
+
+alter table public.game_sessions enable row level security;
+
 alter table public.leaderboard enable row level security;
 
 drop policy if exists "public_read_leaderboard" on public.leaderboard;
@@ -32,8 +41,26 @@ revoke insert, update, delete on public.leaderboard from anon, authenticated;
 revoke select on public.leaderboard from anon, authenticated;
 grant select (display_name, score, updated_at) on public.leaderboard to anon, authenticated;
 grant select (full_name, email) on public.leaderboard to authenticated;
+grant select (email_hash) on public.leaderboard to authenticated;
+revoke all on public.game_sessions from anon, authenticated;
+
+create or replace function public.create_game_session()
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_session_id uuid;
+begin
+  insert into public.game_sessions default values
+  returning session_id into v_session_id;
+  return v_session_id;
+end;
+$$;
 
 create or replace function public.submit_score(
+  p_session_id uuid,
   p_email_hash text,
   p_display_name text,
   p_full_name text,
@@ -45,7 +72,16 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_created_at timestamptz;
+  v_expires_at timestamptz;
+  v_consumed boolean;
+  v_elapsed_seconds numeric;
+  v_max_allowed_score integer;
 begin
+  if p_session_id is null then
+    raise exception 'game session missing or expired';
+  end if;
   if p_email_hash is null or length(trim(p_email_hash)) = 0 then
     raise exception 'email hash required';
   end if;
@@ -62,6 +98,27 @@ begin
     raise exception 'score must be >= 0';
   end if;
 
+  select created_at, expires_at, consumed
+    into v_created_at, v_expires_at, v_consumed
+  from public.game_sessions
+  where session_id = p_session_id
+  for update;
+
+  if not found or v_consumed or now() > v_expires_at then
+    raise exception 'game session missing or expired';
+  end if;
+
+  v_elapsed_seconds := greatest(1, extract(epoch from (now() - v_created_at)));
+  v_max_allowed_score := floor((v_elapsed_seconds * 5.0) + 5);
+
+  if p_score > v_max_allowed_score then
+    raise exception 'score exceeds allowed pace';
+  end if;
+
+  update public.game_sessions
+  set consumed = true
+  where session_id = p_session_id;
+
   insert into public.leaderboard (email_hash, display_name, full_name, email, score, updated_at)
   values (p_email_hash, p_display_name, p_full_name, p_email, p_score, now())
   on conflict (email_hash) do update
@@ -73,4 +130,27 @@ begin
 end;
 $$;
 
-grant execute on function public.submit_score(text, text, text, text, integer) to anon, authenticated;
+create or replace function public.delete_highscore_entry(
+  p_email_hash text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+  if p_email_hash is null or length(trim(p_email_hash)) = 0 then
+    raise exception 'email hash required';
+  end if;
+
+  delete from public.leaderboard
+  where email_hash = p_email_hash;
+end;
+$$;
+
+grant execute on function public.create_game_session() to anon, authenticated;
+grant execute on function public.submit_score(uuid, text, text, text, text, integer) to anon, authenticated;
+grant execute on function public.delete_highscore_entry(text) to authenticated;

@@ -25,16 +25,31 @@ function renderAdminScores(items) {
     return;
   }
 
-  adminHighscoreListEl.innerHTML = items
-    .map((entry) => `<li>${entry.full_name} | ${entry.email} | ${entry.score}</li>`)
-    .join("");
+  adminHighscoreListEl.innerHTML = "";
+  items.forEach((entry) => {
+    const li = document.createElement("li");
+    const text = document.createElement("span");
+    text.textContent = `${entry.full_name} | ${entry.email} | ${entry.score} `;
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Slett";
+    deleteBtn.dataset.emailHash = entry.email_hash;
+    deleteBtn.className = "submit-score-btn";
+    deleteBtn.style.marginLeft = "0.5rem";
+    deleteBtn.style.padding = "0.25rem 0.5rem";
+
+    li.appendChild(text);
+    li.appendChild(deleteBtn);
+    adminHighscoreListEl.appendChild(li);
+  });
 }
 
 async function loadAdminHighscores() {
   adminMessageEl.textContent = "Laster highscore...";
   const { data, error } = await supabaseClient
     .from("leaderboard")
-    .select("full_name,email,score,updated_at")
+    .select("email_hash,full_name,email,score,updated_at")
     .order("score", { ascending: false })
     .order("updated_at", { ascending: true })
     .limit(HIGHSCORE_LIMIT);
@@ -92,6 +107,23 @@ async function logout() {
   adminMessageEl.textContent = "Logget ut.";
 }
 
+async function deleteHighscore(emailHash) {
+  if (!emailHash) return;
+  const confirmed = window.confirm("Er du sikker på at du vil slette denne highscorescoren?");
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.rpc("delete_highscore_entry", {
+    p_email_hash: emailHash
+  });
+  if (error) {
+    adminMessageEl.textContent = `Kunne ikke slette score: ${error.message}`;
+    return;
+  }
+
+  adminMessageEl.textContent = "Highscore slettet.";
+  await loadAdminHighscores();
+}
+
 async function init() {
   const { data } = await supabaseClient.auth.getSession();
   const isLoggedIn = Boolean(data.session);
@@ -106,4 +138,10 @@ async function init() {
 loginBtn.addEventListener("click", login);
 forgotPasswordBtn.addEventListener("click", forgotPassword);
 logoutBtn.addEventListener("click", logout);
+adminHighscoreListEl.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+  const emailHash = target.dataset.emailHash;
+  await deleteHighscore(emailHash);
+});
 init();
