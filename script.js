@@ -17,15 +17,16 @@ const highscoreListEl = document.getElementById("highscoreList");
 const SUPABASE_URL = "https://uxgvqoelwizzzrorixxt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 
-const DUCK_START_SPEED = 2.6;
-const DUCK_SPEED_STEP = 0.85;
-const DUCK_MAX_SPEED = 14;
+const DUCK_START_SPEED = 3.1;
+const DUCK_SPEED_STEP = 0.525;
 const DUCK_MIN_AXIS_SPEED = 0.75;
 const DUCK_SWERVE_CHANCE_BASE = 0.015;
 const DUCK_SWERVE_CHANCE_GROWTH = 0.003;
 const DUCK_SWERVE_STRENGTH = 0.34;
 const DUCK_WAVE_BASE = 0.35;
 const DUCK_WAVE_GROWTH = 0.08;
+const DUCK_PASSIVE_ACCEL_BASE = 0.0035;
+const DUCK_PASSIVE_ACCEL_SCORE_GAIN = 0.00045;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
@@ -234,6 +235,8 @@ function keepDuckSpeed() {
 }
 
 function applyUnpredictableMovement() {
+  duck.speed += DUCK_PASSIVE_ACCEL_BASE + score * DUCK_PASSIVE_ACCEL_SCORE_GAIN;
+
   duck.wavePhase += 0.16 + score * 0.012;
   const waveIntensity = DUCK_WAVE_BASE + score * DUCK_WAVE_GROWTH;
   const waveX = Math.sin(duck.wavePhase) * waveIntensity;
@@ -288,7 +291,7 @@ function handleDuckHit() {
 
   const thisRound = roundId;
   score += 1;
-  duck.speed = Math.min(DUCK_MAX_SPEED, duck.speed + DUCK_SPEED_STEP);
+  duck.speed += DUCK_SPEED_STEP;
   duck.state = "flat";
   messageEl.textContent = "SQUICH! Anda ble flat!";
   render();
