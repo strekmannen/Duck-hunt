@@ -30,7 +30,6 @@ const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
-const ADMIN_ROUTE = "/admin";
 
 const duck = {
   x: 240,
@@ -49,9 +48,6 @@ let running = true;
 let roundId = 0;
 let squishTimeoutId = null;
 let lastFinishedScore = null;
-const adminMode =
-  window.location.pathname.toLowerCase().endsWith(ADMIN_ROUTE) ||
-  window.location.hash.toLowerCase() === "#/admin";
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -120,20 +116,13 @@ function renderHighscoreItems(items) {
     .slice(0, HIGHSCORE_LIMIT)
     .map((entry) => {
       const publicName = entry.display_name || entry.displayName || "Ukjent";
-      const fullName = entry.full_name || entry.fullName || "-";
-      const email = entry.email || "-";
-      if (adminMode) {
-        return `<li>${fullName} | ${email} | ${entry.score}</li>`;
-      }
       return `<li>${publicName} - ${entry.score}</li>`;
     })
     .join("");
 }
 
 async function fetchGlobalHighscores() {
-  const selectCols = adminMode
-    ? "display_name,full_name,email,score,updated_at"
-    : "display_name,score,updated_at";
+  const selectCols = "display_name,score,updated_at";
   const url = `${SUPABASE_URL}/rest/v1/leaderboard?select=${selectCols}&order=score.desc,updated_at.asc&limit=${HIGHSCORE_LIMIT}`;
   const response = await fetch(url, {
     headers: {
@@ -162,11 +151,7 @@ async function loadAndRenderHighscores(options = {}) {
 }
 
 function updateHighscoreModeText(scope) {
-  if (adminMode) {
-    highscoreModeInfoEl.textContent = `Admin-visning (${scope}): fullt navn, e-post og score.`;
-  } else {
-    highscoreModeInfoEl.textContent = `Vanlig visning (${scope}): fornavn + etternavn initial.`;
-  }
+  highscoreModeInfoEl.textContent = `Vanlig visning (${scope}): fornavn + etternavn initial. Admin-side: /admin`;
 }
 
 async function saveScoreForCurrentPlayer(finalScore) {
@@ -371,7 +356,7 @@ function startGame() {
   duck.waveDirection = Math.random() < 0.5 ? -1 : 1;
   placeDuck();
   setDuckVelocity(duck.speed);
-  messageEl.textContent = "Trykk rett pa anda for a knuse!";
+  messageEl.textContent = "Trykk rett på anda for å knuse!";
   render();
   requestAnimationFrame(tick);
 }
@@ -386,7 +371,7 @@ async function handleScoreSubmit() {
   }
 
   if (lastFinishedScore === null) {
-    messageEl.textContent = "Spill ferdig en runde for a sende inn resultat.";
+    messageEl.textContent = "Spill ferdig en runde for å sende inn resultat.";
     return;
   }
   savePlayerProfile();

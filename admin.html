@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duck Hunt Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-wrapper">
+    <h1>Highscore Admin</h1>
+    <p class="subtitle">Kun innloggede brukere kan se detaljer.</p>
+
+    <section id="loginPanel" class="player-panel" aria-label="Admin innlogging">
+      <label class="field">
+        E-post
+        <input id="adminEmail" type="email" autocomplete="email" placeholder="admin@epost.no" required>
+      </label>
+      <label class="field">
+        Passord
+        <input id="adminPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <button id="loginBtn" type="button" class="submit-score-btn">Logg inn</button>
+    </section>
+
+    <section id="adminPanel" class="highscore" aria-label="Admin highscore" hidden>
+      <div class="highscore-head">
+        <h2>Full highscore</h2>
+        <button id="logoutBtn" type="button">Logg ut</button>
+      </div>
+      <p id="adminMessage" class="highscore-mode-info">Laster...</p>
+      <ol id="adminHighscoreList"></ol>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -16,13 +16,22 @@ alter table public.leaderboard
 alter table public.leaderboard enable row level security;
 
 drop policy if exists "public_read_leaderboard" on public.leaderboard;
+drop policy if exists "authenticated_read_leaderboard" on public.leaderboard;
 create policy "public_read_leaderboard"
 on public.leaderboard
 for select
 using (true);
 
+create policy "authenticated_read_leaderboard"
+on public.leaderboard
+for select
+to authenticated
+using (true);
+
 revoke insert, update, delete on public.leaderboard from anon, authenticated;
-grant select on public.leaderboard to anon, authenticated;
+revoke select on public.leaderboard from anon, authenticated;
+grant select (display_name, score, updated_at) on public.leaderboard to anon, authenticated;
+grant select (full_name, email) on public.leaderboard to authenticated;
 
 create or replace function public.submit_score(
   p_email_hash text,
