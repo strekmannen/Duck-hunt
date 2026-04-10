@@ -58,7 +58,8 @@ async function login() {
 
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) {
-    adminMessageEl.textContent = "Innlogging feilet. Sjekk e-post/passord.";
+    adminMessageEl.textContent = `Innlogging feilet: ${error.message}`;
+    console.error("Admin login error:", error);
     return;
   }
 
