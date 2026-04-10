@@ -17,9 +17,15 @@ const highscoreListEl = document.getElementById("highscoreList");
 const SUPABASE_URL = "https://uxgvqoelwizzzrorixxt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 
-const DUCK_START_SPEED = 1.8;
-const DUCK_SPEED_STEP = 0.35;
-const DUCK_MAX_SPEED = 8;
+const DUCK_START_SPEED = 2.6;
+const DUCK_SPEED_STEP = 0.85;
+const DUCK_MAX_SPEED = 14;
+const DUCK_MIN_AXIS_SPEED = 0.75;
+const DUCK_SWERVE_CHANCE_BASE = 0.015;
+const DUCK_SWERVE_CHANCE_GROWTH = 0.003;
+const DUCK_SWERVE_STRENGTH = 0.34;
+const DUCK_WAVE_BASE = 0.35;
+const DUCK_WAVE_GROWTH = 0.08;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const HIGHSCORE_KEY = "badeand_highscores_v1";
@@ -27,7 +33,17 @@ const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const ADMIN_ROUTE = "/admin";
 
-const duck = { x: 240, y: 160, size: 84, speed: DUCK_START_SPEED, vx: 1.2, vy: 1.2, state: "whole" };
+const duck = {
+  x: 240,
+  y: 160,
+  size: 84,
+  speed: DUCK_START_SPEED,
+  vx: 1.2,
+  vy: 1.2,
+  state: "whole",
+  wavePhase: Math.random() * Math.PI * 2,
+  waveDirection: Math.random() < 0.5 ? -1 : 1
+};
 let score = 0;
 let lives = START_LIVES;
 let running = true;
@@ -251,8 +267,38 @@ function setDuckVelocity(speed) {
   const angle = Math.random() * Math.PI * 2;
   duck.vx = Math.cos(angle) * speed;
   duck.vy = Math.sin(angle) * speed;
-  if (Math.abs(duck.vx) < 0.45) duck.vx = Math.sign(duck.vx || 1) * 0.45;
-  if (Math.abs(duck.vy) < 0.45) duck.vy = Math.sign(duck.vy || 1) * 0.45;
+  if (Math.abs(duck.vx) < DUCK_MIN_AXIS_SPEED) duck.vx = Math.sign(duck.vx || 1) * DUCK_MIN_AXIS_SPEED;
+  if (Math.abs(duck.vy) < DUCK_MIN_AXIS_SPEED) duck.vy = Math.sign(duck.vy || 1) * DUCK_MIN_AXIS_SPEED;
+}
+
+function keepDuckSpeed() {
+  const current = Math.hypot(duck.vx, duck.vy) || 1;
+  const target = duck.speed;
+  duck.vx = (duck.vx / current) * target;
+  duck.vy = (duck.vy / current) * target;
+}
+
+function applyUnpredictableMovement() {
+  duck.wavePhase += 0.16 + score * 0.012;
+  const waveIntensity = DUCK_WAVE_BASE + score * DUCK_WAVE_GROWTH;
+  const waveX = Math.sin(duck.wavePhase) * waveIntensity;
+  const waveY = Math.cos(duck.wavePhase * 1.25) * waveIntensity;
+  duck.vx += waveX * 0.018 * duck.waveDirection;
+  duck.vy += waveY * 0.018;
+
+  const swerveChance = Math.min(0.22, DUCK_SWERVE_CHANCE_BASE + score * DUCK_SWERVE_CHANCE_GROWTH);
+  if (Math.random() < swerveChance) {
+    const turn = (Math.random() * 2 - 1) * DUCK_SWERVE_STRENGTH;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const nextVx = duck.vx * cos - duck.vy * sin;
+    const nextVy = duck.vx * sin + duck.vy * cos;
+    duck.vx = nextVx;
+    duck.vy = nextVy;
+    if (Math.random() < 0.25) duck.waveDirection *= -1;
+  }
+
+  keepDuckSpeed();
 }
 
 function applyDuckSprite() {
@@ -319,6 +365,7 @@ function tick() {
   if (!running) return;
 
   if (duck.state === "whole") {
+    applyUnpredictableMovement();
     duck.x += duck.vx;
     duck.y += duck.vy;
     const maxDuckX = gameArea.clientWidth - duck.size;
@@ -350,6 +397,8 @@ function startGame() {
   lastFinishedScore = null;
   duck.speed = DUCK_START_SPEED;
   duck.state = "whole";
+  duck.wavePhase = Math.random() * Math.PI * 2;
+  duck.waveDirection = Math.random() < 0.5 ? -1 : 1;
   placeDuck();
   setDuckVelocity(duck.speed);
   messageEl.textContent = "Trykk rett pa anda for a knuse!";
