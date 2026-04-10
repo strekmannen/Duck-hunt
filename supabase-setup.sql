@@ -7,6 +7,12 @@ create table if not exists public.leaderboard (
   updated_at timestamptz not null default now()
 );
 
+alter table public.leaderboard
+  add column if not exists full_name text not null default '';
+
+alter table public.leaderboard
+  add column if not exists email text not null default '';
+
 alter table public.leaderboard enable row level security;
 
 drop policy if exists "public_read_leaderboard" on public.leaderboard;

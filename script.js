@@ -160,8 +160,9 @@ async function fetchGlobalHighscores() {
   return response.json();
 }
 
-async function loadAndRenderHighscores() {
-  if (isSupabaseConfigured()) {
+async function loadAndRenderHighscores(options = {}) {
+  const preferLocal = Boolean(options.preferLocal);
+  if (isSupabaseConfigured() && !preferLocal) {
     try {
       const items = await fetchGlobalHighscores();
       renderHighscoreItems(items);
@@ -217,10 +218,14 @@ async function saveScoreForCurrentPlayer(finalScore) {
           p_score: finalScore
         })
       });
-      if (!response.ok) throw new Error("submit_score failed");
+      if (!response.ok) {
+        const details = await response.text();
+        throw new Error(`submit_score failed: ${details}`);
+      }
       await loadAndRenderHighscores();
       return { saved: true, scope: "global" };
-    } catch {
+    } catch (error) {
+      console.warn("Global score save failed, falling back to local highscore.", error);
       // fall back to local if API is unavailable
     }
   }
@@ -240,7 +245,7 @@ async function saveScoreForCurrentPlayer(finalScore) {
     highscores[idx].updatedAt = now;
   }
   setLocalHighscores(highscores);
-  await loadAndRenderHighscores();
+  await loadAndRenderHighscores({ preferLocal: true });
   return { saved: true, scope: "local" };
 }
 
