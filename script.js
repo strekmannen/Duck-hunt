@@ -20,11 +20,6 @@ const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 const DUCK_START_SPEED = 3.1;
 const DUCK_SPEED_STEP = 0.2625;
 const DUCK_MIN_AXIS_SPEED = 0.75;
-const DUCK_SWERVE_CHANCE_BASE = 0.015;
-const DUCK_SWERVE_CHANCE_GROWTH = 0.003;
-const DUCK_SWERVE_STRENGTH = 0.34;
-const DUCK_WAVE_BASE = 0.35;
-const DUCK_WAVE_GROWTH = 0.08;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
@@ -37,9 +32,7 @@ const duck = {
   speed: DUCK_START_SPEED,
   vx: 1.2,
   vy: 1.2,
-  state: "whole",
-  wavePhase: Math.random() * Math.PI * 2,
-  waveDirection: Math.random() < 0.5 ? -1 : 1
+  state: "whole"
 };
 let score = 0;
 let lives = START_LIVES;
@@ -232,29 +225,6 @@ function keepDuckSpeed() {
   duck.vy = (duck.vy / current) * target;
 }
 
-function applyUnpredictableMovement() {
-  duck.wavePhase += 0.16 + score * 0.012;
-  const waveIntensity = DUCK_WAVE_BASE + score * DUCK_WAVE_GROWTH;
-  const waveX = Math.sin(duck.wavePhase) * waveIntensity;
-  const waveY = Math.cos(duck.wavePhase * 1.25) * waveIntensity;
-  duck.vx += waveX * 0.018 * duck.waveDirection;
-  duck.vy += waveY * 0.018;
-
-  const swerveChance = Math.min(0.22, DUCK_SWERVE_CHANCE_BASE + score * DUCK_SWERVE_CHANCE_GROWTH);
-  if (Math.random() < swerveChance) {
-    const turn = (Math.random() * 2 - 1) * DUCK_SWERVE_STRENGTH;
-    const cos = Math.cos(turn);
-    const sin = Math.sin(turn);
-    const nextVx = duck.vx * cos - duck.vy * sin;
-    const nextVy = duck.vx * sin + duck.vy * cos;
-    duck.vx = nextVx;
-    duck.vy = nextVy;
-    if (Math.random() < 0.25) duck.waveDirection *= -1;
-  }
-
-  keepDuckSpeed();
-}
-
 function applyDuckSprite() {
   duckEl.classList.toggle("flat", duck.state === "flat");
 }
@@ -319,7 +289,7 @@ function tick() {
   if (!running) return;
 
   if (duck.state === "whole") {
-    applyUnpredictableMovement();
+    keepDuckSpeed();
     duck.x += duck.vx;
     duck.y += duck.vy;
     const maxDuckX = gameArea.clientWidth - duck.size;
@@ -351,8 +321,6 @@ function startGame() {
   lastFinishedScore = null;
   duck.speed = DUCK_START_SPEED;
   duck.state = "whole";
-  duck.wavePhase = Math.random() * Math.PI * 2;
-  duck.waveDirection = Math.random() < 0.5 ? -1 : 1;
   placeDuck();
   setDuckVelocity(duck.speed);
   messageEl.textContent = "Trykk rett på anda for å knuse!";
