@@ -18,7 +18,7 @@ const SUPABASE_URL = "https://uxgvqoelwizzzrorixxt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 
 const DUCK_START_SPEED = 3.1;
-const DUCK_SPEED_STEP = 0.525;
+const DUCK_SPEED_STEP = 0.2625;
 const DUCK_MIN_AXIS_SPEED = 0.75;
 const DUCK_SWERVE_CHANCE_BASE = 0.015;
 const DUCK_SWERVE_CHANCE_GROWTH = 0.003;
