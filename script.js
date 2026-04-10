@@ -151,6 +151,12 @@ async function createGameSession() {
   throw new Error("create_game_session returned unexpected payload");
 }
 
+async function ensureGameSession() {
+  if (currentGameSessionId) return currentGameSessionId;
+  currentGameSessionId = await createGameSession();
+  return currentGameSessionId;
+}
+
 async function loadAndRenderHighscores(options = {}) {
   if (!isSupabaseConfigured()) {
     highscoreListEl.innerHTML = "<li>Global highscore er ikke konfigurert.</li>";
@@ -309,7 +315,8 @@ function handleDuckHit() {
   if (squishTimeoutId) clearTimeout(squishTimeoutId);
 
   const thisRound = roundId;
-  registerHitForCurrentSession()
+  ensureGameSession()
+    .then(() => registerHitForCurrentSession())
     .then((serverScore) => {
       score = serverScore;
       duck.speed += DUCK_SPEED_STEP;
@@ -329,6 +336,16 @@ function handleDuckHit() {
     .catch((error) => {
       console.warn("Hit rejected by anti-cheat.", error);
       const msg = String(error.message || "");
+      if (msg.includes("create_game_session failed")) {
+        messageEl.textContent = "Anti-cheat er ikke klar. Kjør oppdatert SQL i Supabase.";
+        currentGameSessionId = null;
+        return;
+      }
+      if (msg.includes("register_hit failed")) {
+        messageEl.textContent = "Treff kunne ikke verifiseres. Sjekk at register_hit finnes i Supabase.";
+        currentGameSessionId = null;
+        return;
+      }
       if (msg.includes("hit rate too high")) {
         messageEl.textContent = "Treff avvist: for rask treff-rate.";
         return;
@@ -394,7 +411,7 @@ function startGame() {
   requestAnimationFrame(tick);
 
   if (isSupabaseConfigured()) {
-    createGameSession()
+    ensureGameSession()
       .then((sessionId) => {
         currentGameSessionId = sessionId;
       })
