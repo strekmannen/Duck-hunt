@@ -25,8 +25,6 @@ const DUCK_SWERVE_CHANCE_GROWTH = 0.003;
 const DUCK_SWERVE_STRENGTH = 0.34;
 const DUCK_WAVE_BASE = 0.35;
 const DUCK_WAVE_GROWTH = 0.08;
-const DUCK_PASSIVE_ACCEL_BASE = 0.0035;
-const DUCK_PASSIVE_ACCEL_SCORE_GAIN = 0.00045;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
@@ -235,8 +233,6 @@ function keepDuckSpeed() {
 }
 
 function applyUnpredictableMovement() {
-  duck.speed += DUCK_PASSIVE_ACCEL_BASE + score * DUCK_PASSIVE_ACCEL_SCORE_GAIN;
-
   duck.wavePhase += 0.16 + score * 0.012;
   const waveIntensity = DUCK_WAVE_BASE + score * DUCK_WAVE_GROWTH;
   const waveX = Math.sin(duck.wavePhase) * waveIntensity;
