@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fang Badeanda!</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-wrapper">
+    <h1>Knus Badeanda!</h1>
+    <p class="subtitle">Knus flest badeender og vinn 75% rabatt pa lokalleie ut september.</p>
+
+    <section class="hud" aria-label="Spillstatus">
+      <div>Poeng: <span id="score">0</span></div>
+      <div class="lives-hud">Liv:
+        <span id="livesIcons" class="lives-icons" aria-label="Antall liv">
+          <span class="life-icon" aria-hidden="true"></span>
+          <span class="life-icon" aria-hidden="true"></span>
+          <span class="life-icon" aria-hidden="true"></span>
+        </span>
+      </div>
+      <button id="restartBtn" type="button">Start på nytt</button>
+    </section>
+
+    <section id="gameArea" class="game-area" aria-label="Spillområde">
+      <div id="duck" class="sprite duck" aria-hidden="true"></div>
+    </section>
+
+    <p id="message" class="message" aria-live="polite">
+      Trykk på anda for å squiche den. Bommer du 3 ganger er spillet over.
+    </p>
+
+    <section class="player-panel" aria-label="Spillerinfo">
+      <label class="field">
+        Fullt navn
+        <input id="playerName" type="text" autocomplete="name" placeholder="Ola Nordmann">
+      </label>
+      <label class="field">
+        E-post
+        <input id="playerEmail" type="email" autocomplete="email" placeholder="ola@epost.no">
+      </label>
+    </section>
+
+    <section class="highscore" aria-label="Highscoreliste">
+      <h2>Highscore</h2>
+      <ol id="highscoreList"></ol>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

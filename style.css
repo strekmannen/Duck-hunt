@@ -1,0 +1,237 @@
+:root {
+  --bg-1: #15002b;
+  --bg-2: #2a004e;
+  --neon-pink: #ff3cac;
+  --neon-blue: #29d8ff;
+  --neon-yellow: #ffe66d;
+  --text: #f7f1ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, #35135a 0%, transparent 35%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-2));
+}
+
+.game-wrapper {
+  width: min(96vw, 720px);
+  padding: 0.8rem 0.9rem 1rem;
+  border: 3px solid var(--neon-blue);
+  border-radius: 16px;
+  background: rgba(5, 0, 12, 0.72);
+  box-shadow: 0 0 14px var(--neon-blue), 0 0 30px rgba(41, 216, 255, 0.3);
+}
+
+h1 {
+  margin: 0;
+  text-align: center;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 8px var(--neon-yellow);
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  margin: 0.3rem 0 1rem;
+  text-align: center;
+  color: var(--neon-pink);
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.lives-hud {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lives-icons {
+  display: inline-flex;
+  gap: 0.25rem;
+  vertical-align: middle;
+}
+
+.life-icon {
+  width: 22px;
+  height: 22px;
+  background-image: url("duck-whole-source.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.45));
+}
+
+.life-icon.lost {
+  opacity: 0.2;
+  filter: grayscale(1);
+}
+
+#restartBtn {
+  border: 2px solid var(--neon-pink);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#restartBtn:hover {
+  background: rgba(255, 60, 172, 0.15);
+}
+
+.game-area {
+  position: relative;
+  width: 100%;
+  height: min(70dvh, 520px);
+  border: 3px solid var(--neon-pink);
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.02)),
+    repeating-linear-gradient(
+      to right,
+      rgba(41, 216, 255, 0.15) 0,
+      rgba(41, 216, 255, 0.15) 2px,
+      transparent 2px,
+      transparent 40px
+    );
+  background-size: cover, auto;
+  background-position: center, center;
+  background-repeat: no-repeat, repeat;
+  touch-action: none;
+}
+
+.game-area::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("logo.png") center / contain no-repeat;
+  opacity: 0.16;
+  filter: invert(1) saturate(1.1) contrast(1.08);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.sprite {
+  position: absolute;
+  font-size: 2rem;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
+}
+
+.duck {
+  width: 70px;
+  height: 70px;
+  background-image: url("duck-whole-source.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  animation: bob 0.9s ease-in-out infinite alternate;
+  touch-action: manipulation;
+}
+
+.duck.flat {
+  width: 96px;
+  height: 64px;
+  background-image: url("duck-flat-source.png");
+  animation: none;
+}
+
+@keyframes bob {
+  from { transform: translateY(-1px); }
+  to { transform: translateY(2px); }
+}
+
+.message {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  min-height: 1.3rem;
+}
+
+.player-panel {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+.field input {
+  border: 2px solid rgba(41, 216, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  padding: 0.5rem 0.55rem;
+}
+
+.highscore {
+  margin-top: 0.9rem;
+  border: 1px solid rgba(255, 60, 172, 0.4);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.highscore h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: var(--neon-yellow);
+}
+
+#highscoreList {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+#highscoreList li {
+  margin: 0.1rem 0;
+}
+
+@media (max-width: 560px) {
+  .game-wrapper {
+    border-width: 2px;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  .subtitle {
+    font-size: 0.95rem;
+  }
+
+  .duck {
+    width: 84px;
+    height: 84px;
+  }
+
+  .player-panel {
+    grid-template-columns: 1fr;
+  }
+}
