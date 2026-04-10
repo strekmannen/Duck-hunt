@@ -28,7 +28,6 @@ const DUCK_WAVE_BASE = 0.35;
 const DUCK_WAVE_GROWTH = 0.08;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
-const HIGHSCORE_KEY = "badeand_highscores_v1";
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const ADMIN_ROUTE = "/admin";
@@ -85,20 +84,6 @@ async function sha256(text) {
   const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function getLocalHighscores() {
-  try {
-    const raw = localStorage.getItem(HIGHSCORE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function setLocalHighscores(items) {
-  localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(items));
 }
 
 function savePlayerProfile() {
@@ -161,22 +146,19 @@ async function fetchGlobalHighscores() {
 }
 
 async function loadAndRenderHighscores(options = {}) {
-  const preferLocal = Boolean(options.preferLocal);
-  if (isSupabaseConfigured() && !preferLocal) {
-    try {
-      const items = await fetchGlobalHighscores();
-      renderHighscoreItems(items);
-      updateHighscoreModeText("global");
-      return;
-    } catch {
-      // fall back to local
-    }
+  if (!isSupabaseConfigured()) {
+    highscoreListEl.innerHTML = "<li>Global highscore er ikke konfigurert.</li>";
+    updateHighscoreModeText("global");
+    return;
   }
-  const local = getLocalHighscores()
-    .sort((a, b) => b.score - a.score || (a.updatedAt || 0) - (b.updatedAt || 0))
-    .slice(0, HIGHSCORE_LIMIT);
-  renderHighscoreItems(local);
-  updateHighscoreModeText("local");
+  try {
+    const items = await fetchGlobalHighscores();
+    renderHighscoreItems(items);
+    updateHighscoreModeText("global");
+  } catch {
+    highscoreListEl.innerHTML = "<li>Kunne ikke hente global highscore akkurat nå.</li>";
+    updateHighscoreModeText("global");
+  }
 }
 
 function updateHighscoreModeText(scope) {
@@ -225,28 +207,11 @@ async function saveScoreForCurrentPlayer(finalScore) {
       await loadAndRenderHighscores();
       return { saved: true, scope: "global" };
     } catch (error) {
-      console.warn("Global score save failed, falling back to local highscore.", error);
-      // fall back to local if API is unavailable
+      console.warn("Global score save failed.", error);
+      return { saved: false, reason: "global_save_failed" };
     }
   }
-
-  const highscores = getLocalHighscores();
-  const idx = highscores.findIndex((item) => item.email === email);
-  const now = Date.now();
-  if (idx === -1) {
-    highscores.push({ email, firstName, lastName, fullName, displayName, score: finalScore, updatedAt: now });
-  } else {
-    highscores[idx].firstName = firstName;
-    highscores[idx].lastName = lastName;
-    highscores[idx].fullName = fullName;
-    highscores[idx].displayName = displayName;
-    highscores[idx].email = email;
-    highscores[idx].score = Math.max(highscores[idx].score, finalScore);
-    highscores[idx].updatedAt = now;
-  }
-  setLocalHighscores(highscores);
-  await loadAndRenderHighscores({ preferLocal: true });
-  return { saved: true, scope: "local" };
+  return { saved: false, reason: "global_not_configured" };
 }
 
 function clamp(value, min, max) {
@@ -427,14 +392,18 @@ async function handleScoreSubmit() {
   savePlayerProfile();
   const result = await saveScoreForCurrentPlayer(lastFinishedScore);
   if (!result.saved) {
+    if (result.reason === "global_not_configured") {
+      messageEl.textContent = "Global highscore er ikke konfigurert.";
+      return;
+    }
+    if (result.reason === "global_save_failed") {
+      messageEl.textContent = "Kunne ikke sende til global highscore akkurat nå. Prøv igjen.";
+      return;
+    }
     messageEl.textContent = "Alle felt er obligatoriske: fornavn, etternavn og gyldig e-post.";
     return;
   }
-  if (result.scope === "global") {
-    messageEl.textContent = `Resultat ${lastFinishedScore} sendt inn til global highscore.`;
-  } else {
-    messageEl.textContent = `Resultat ${lastFinishedScore} lagret lokalt.`;
-  }
+  messageEl.textContent = `Resultat ${lastFinishedScore} sendt inn til global highscore.`;
 }
 
 duckEl.addEventListener("pointerdown", (event) => {
