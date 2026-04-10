@@ -55,6 +55,11 @@ h1 {
   font-size: 1rem;
 }
 
+.hud-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
 .lives-hud {
   display: inline-flex;
   align-items: center;
@@ -82,7 +87,9 @@ h1 {
   filter: grayscale(1);
 }
 
-#restartBtn {
+#restartBtn,
+#highscoreBtn,
+.submit-score-btn {
   border: 2px solid var(--neon-pink);
   border-radius: 8px;
   background: transparent;
@@ -92,7 +99,9 @@ h1 {
   touch-action: manipulation;
 }
 
-#restartBtn:hover {
+#restartBtn:hover,
+#highscoreBtn:hover,
+.submit-score-btn:hover {
   background: rgba(255, 60, 172, 0.15);
 }
 
@@ -172,8 +181,12 @@ h1 {
 .player-panel {
   margin-top: 0.9rem;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 0.6rem;
+}
+
+.submit-score-btn {
+  grid-column: 1 / -1;
 }
 
 .field {
@@ -198,10 +211,23 @@ h1 {
   background: rgba(0, 0, 0, 0.22);
 }
 
+.highscore-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .highscore h2 {
   margin: 0 0 0.35rem;
   font-size: 1rem;
   color: var(--neon-yellow);
+}
+
+.highscore-mode-info {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.86);
 }
 
 #highscoreList {

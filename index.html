@@ -20,7 +20,10 @@
           <span class="life-icon" aria-hidden="true"></span>
         </span>
       </div>
-      <button id="restartBtn" type="button">Start på nytt</button>
+      <div class="hud-actions">
+        <button id="highscoreBtn" type="button">Highscore</button>
+        <button id="restartBtn" type="button">Start på nytt</button>
+      </div>
     </section>
 
     <section id="gameArea" class="game-area" aria-label="Spillområde">
@@ -33,17 +36,25 @@
 
     <section class="player-panel" aria-label="Spillerinfo">
       <label class="field">
-        Fullt navn
-        <input id="playerName" type="text" autocomplete="name" placeholder="Ola Nordmann">
+        Fornavn
+        <input id="playerFirstName" type="text" autocomplete="given-name" placeholder="Ola" required>
+      </label>
+      <label class="field">
+        Etternavn
+        <input id="playerLastName" type="text" autocomplete="family-name" placeholder="Nordmann" required>
       </label>
       <label class="field">
         E-post
-        <input id="playerEmail" type="email" autocomplete="email" placeholder="ola@epost.no">
+        <input id="playerEmail" type="email" autocomplete="email" placeholder="ola@epost.no" required>
       </label>
+      <button id="submitScoreBtn" type="button" class="submit-score-btn">Send inn resultat</button>
     </section>
 
-    <section class="highscore" aria-label="Highscoreliste">
-      <h2>Highscore</h2>
+    <section id="highscorePanel" class="highscore" aria-label="Highscoreliste">
+      <div class="highscore-head">
+        <h2>Highscore</h2>
+      </div>
+      <p id="highscoreModeInfo" class="highscore-mode-info">Vanlig visning: fornavn + etternavn initial. Admin-visning finnes på /admin.</p>
       <ol id="highscoreList"></ol>
     </section>
   </main>
