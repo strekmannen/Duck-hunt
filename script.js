@@ -239,7 +239,8 @@ async function saveScoreForCurrentPlayer() {
           p_email_hash: emailHash,
           p_display_name: displayName,
           p_full_name: fullName,
-          p_email: email
+          p_email: email,
+          p_client_score: score
         })
       });
       if (!response.ok) {
@@ -253,6 +254,9 @@ async function saveScoreForCurrentPlayer() {
       const msg = String(error.message || "");
       if (msg.includes("score exceeds allowed pace")) {
         return { saved: false, reason: "score_rejected" };
+      }
+      if (msg.includes("submit_score(")) {
+        return { saved: false, reason: "sql_not_updated" };
       }
       if (msg.includes("game session missing or expired")) {
         return { saved: false, reason: "missing_session" };
@@ -474,6 +478,10 @@ function endGame() {
       }
       if (result.reason === "score_rejected") {
         messageEl.textContent = "Resultatet ble avvist av anti-cheat-kontroll.";
+        return;
+      }
+      if (result.reason === "sql_not_updated") {
+        messageEl.textContent = "Resultatet ble ikke lagret: oppdater Supabase SQL (submit_score-signatur).";
         return;
       }
       messageEl.textContent = "Resultatet kunne ikke lagres akkurat nå. Prøv igjen neste runde.";

@@ -16,6 +16,7 @@ body {
   min-height: 100dvh;
   display: grid;
   place-items: center;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   color: var(--text);
   background:
@@ -50,6 +51,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
   font-size: 1rem;
@@ -95,6 +97,7 @@ h1 {
   background: transparent;
   color: var(--text);
   padding: 0.55rem 0.8rem;
+  min-height: 44px;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -108,7 +111,7 @@ h1 {
 .game-area {
   position: relative;
   width: 100%;
-  height: min(70dvh, 520px);
+  height: clamp(340px, 62dvh, 520px);
   border: 3px solid var(--neon-pink);
   border-radius: 12px;
   overflow: hidden;
@@ -223,6 +226,7 @@ h1 {
   background: rgba(0, 0, 0, 0.25);
   color: var(--text);
   padding: 0.5rem 0.55rem;
+  font-size: 16px;
 }
 
 .highscore {
@@ -263,7 +267,10 @@ h1 {
 
 @media (max-width: 560px) {
   .game-wrapper {
+    width: 100%;
     border-width: 2px;
+    border-radius: 12px;
+    padding: 0.7rem 0.65rem 0.8rem;
   }
 
   h1 {
@@ -272,14 +279,98 @@ h1 {
 
   .subtitle {
     font-size: 0.95rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .hud {
+    align-items: stretch;
+    gap: 0.45rem;
+    font-size: 0.95rem;
+  }
+
+  .hud > div {
+    flex: 1 1 45%;
+    min-width: 0;
+  }
+
+  .hud-actions {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+
+  #restartBtn,
+  #highscoreBtn {
+    width: 100%;
+  }
+
+  .game-area {
+    height: clamp(300px, 52dvh, 430px);
+    border-radius: 10px;
   }
 
   .duck {
-    width: 84px;
-    height: 84px;
+    width: 92px;
+    height: 92px;
+  }
+
+  .duck.flat {
+    width: 112px;
+    height: 74px;
+  }
+
+  .message {
+    font-size: 0.95rem;
+    line-height: 1.35;
   }
 
   .player-panel {
     grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .field {
+    font-size: 0.95rem;
+  }
+
+  .field input {
+    min-height: 44px;
+  }
+
+  .highscore {
+    padding: 0.55rem 0.6rem;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: 1.3rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .hud {
+    font-size: 0.9rem;
+  }
+
+  .hud-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .game-area {
+    height: clamp(270px, 50dvh, 380px);
+  }
+
+  .duck {
+    width: 88px;
+    height: 88px;
+  }
+
+  .duck.flat {
+    width: 108px;
+    height: 70px;
   }
 }

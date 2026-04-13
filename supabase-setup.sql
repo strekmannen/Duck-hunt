@@ -72,7 +72,8 @@ create or replace function public.submit_score(
   p_email_hash text,
   p_display_name text,
   p_full_name text,
-  p_email text
+  p_email text,
+  p_client_score integer
 )
 returns void
 language plpgsql
@@ -103,6 +104,9 @@ begin
   if p_email is null or length(trim(p_email)) = 0 then
     raise exception 'email required';
   end if;
+  if p_client_score is null or p_client_score < 0 then
+    raise exception 'client score required';
+  end if;
   select created_at, expires_at, consumed, hits_count
     into v_created_at, v_expires_at, v_consumed, v_hits_count
   from public.game_sessions
@@ -121,12 +125,21 @@ begin
     raise exception 'score exceeds allowed pace';
   end if;
 
+  -- Combojeger score is client-visible points. For anti-cheat we bound it by hit count:
+  -- minimum points for n hits is n; maximum (perfect combo) is n^2 + 9n.
+  if p_client_score < v_hits_count then
+    raise exception 'client score below hit count';
+  end if;
+  if p_client_score > (v_hits_count * v_hits_count) + (9 * v_hits_count) then
+    raise exception 'client score exceeds combo cap';
+  end if;
+
   update public.game_sessions
   set consumed = true
   where session_id = p_session_id;
 
   insert into public.leaderboard (email_hash, display_name, full_name, email, score, updated_at)
-  values (p_email_hash, p_display_name, p_full_name, p_email, v_server_score, now())
+  values (p_email_hash, p_display_name, p_full_name, p_email, p_client_score, now())
   on conflict (email_hash) do update
     set display_name = excluded.display_name,
         full_name = excluded.full_name,
@@ -210,5 +223,5 @@ $$;
 
 grant execute on function public.create_game_session() to anon, authenticated;
 grant execute on function public.register_hit(uuid) to anon, authenticated;
-grant execute on function public.submit_score(uuid, text, text, text, text) to anon, authenticated;
+grant execute on function public.submit_score(uuid, text, text, text, text, integer) to anon, authenticated;
 grant execute on function public.delete_highscore_entry(text) to authenticated;
