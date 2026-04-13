@@ -518,11 +518,16 @@ function handleDuckHit() {
       duck.speed = speedForWave(wave);
       duck.state = "flat";
       createFloatingPoints(earnedPoints);
-      messageEl.textContent = reachedNewWave
-        ? `SQUICH! +${earnedPoints} poeng. Wave ${wave}!`
-        : comboBonus > 0
-          ? `SQUICH! +${earnedPoints} poeng! Combo-bonus for ${comboStreak} treff pa rad!`
-          : `SQUICH! +${earnedPoints} poeng (reaksjon ${Math.round(reactionMs)}ms)`;
+      const statusParts = [`SQUICH! +${earnedPoints} poeng`];
+      if (comboBonus > 0) {
+        statusParts.push(`${comboStreak}x streak +${comboBonus}p`);
+      }
+      if (reachedNewWave) {
+        statusParts.push(`Wave ${wave}!`);
+      } else if (comboBonus === 0) {
+        statusParts.push(`reaksjon ${Math.round(reactionMs)}ms`);
+      }
+      messageEl.textContent = statusParts.join(" | ");
       render();
 
       squishTimeoutId = setTimeout(() => {
