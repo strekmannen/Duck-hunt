@@ -1,6 +1,7 @@
 const gameArea = document.getElementById("gameArea");
 const duckEl = document.getElementById("duck");
 const scoreEl = document.getElementById("score");
+const waveEl = document.getElementById("wave");
 const messageEl = document.getElementById("message");
 const restartBtn = document.getElementById("restartBtn");
 const highscoreBtn = document.getElementById("highscoreBtn");
@@ -16,12 +17,18 @@ const SUPABASE_URL = "https://uxgvqoelwizzzrorixxt.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 
 const DUCK_START_SPEED = 3.1;
-const DUCK_SPEED_STEP = 0.2625;
 const DUCK_MIN_AXIS_SPEED = 0.75;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const BASE_POINTS_PER_HIT = 10;
 const COMBO_BONUS_STEP = 2;
+const DUCKS_PER_WAVE = 6;
+const WAVE_SPEED_STEP = 0.45;
+const CROSS_ENTRY_MARGIN_RATIO = 0.18;
+const REDIRECT_CANDIDATES = 7;
+const MIN_REDIRECT_ANGLE_DELTA = 0.7;
+const MIN_ENTRY_GAP_RATIO = 0.2;
+const SIDE_VARIATION_CHANCE = 0.4;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const SESSION_CREATE_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/create_game_session`;
@@ -43,6 +50,11 @@ let roundId = 0;
 let squishTimeoutId = null;
 let currentGameSessionId = null;
 let comboStreak = 0;
+let wave = 1;
+let hitsInWave = 0;
+let totalHits = 0;
+let lastRedirectAngle = null;
+let lastEntry = null;
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -278,6 +290,17 @@ function setDuckVelocity(speed) {
   if (Math.abs(duck.vy) < DUCK_MIN_AXIS_SPEED) duck.vy = Math.sign(duck.vy || 1) * DUCK_MIN_AXIS_SPEED;
 }
 
+function setDuckVelocityToward(targetX, targetY, speed) {
+  const dx = targetX - duck.x;
+  const dy = targetY - duck.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  duck.vx = (dx / distance) * speed;
+  duck.vy = (dy / distance) * speed;
+  if (Math.abs(duck.vx) < DUCK_MIN_AXIS_SPEED) duck.vx = Math.sign(duck.vx || 1) * DUCK_MIN_AXIS_SPEED;
+  if (Math.abs(duck.vy) < DUCK_MIN_AXIS_SPEED) duck.vy = Math.sign(duck.vy || 1) * DUCK_MIN_AXIS_SPEED;
+  keepDuckSpeed();
+}
+
 function keepDuckSpeed() {
   const current = Math.hypot(duck.vx, duck.vy) || 1;
   const target = duck.speed;
@@ -299,6 +322,7 @@ function render() {
   duckEl.style.left = `${duck.x}px`;
   duckEl.style.top = `${duck.y}px`;
   scoreEl.textContent = String(score);
+  waveEl.textContent = String(wave);
   updateLivesIcons();
   applyDuckSprite();
 }
@@ -319,6 +343,118 @@ function createFloatingPoints(points) {
 
 function calculateComboPoints() {
   return BASE_POINTS_PER_HIT + Math.max(0, comboStreak - 1) * COMBO_BONUS_STEP;
+}
+
+function speedForWave(waveNumber) {
+  return DUCK_START_SPEED + Math.max(0, waveNumber - 1) * WAVE_SPEED_STEP;
+}
+
+function randomInRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function angleDelta(a, b) {
+  const fullTurn = Math.PI * 2;
+  const raw = Math.abs(a - b) % fullTurn;
+  return raw > Math.PI ? fullTurn - raw : raw;
+}
+
+function pickEntryCoord(minCoord, maxCoord, lastCoord) {
+  if (!Number.isFinite(lastCoord)) return randomInRange(minCoord, maxCoord);
+  const range = Math.max(1, maxCoord - minCoord);
+  const minGap = range * MIN_ENTRY_GAP_RATIO;
+  let chosen = randomInRange(minCoord, maxCoord);
+  for (let i = 0; i < 5; i += 1) {
+    if (Math.abs(chosen - lastCoord) >= minGap) return chosen;
+    chosen = randomInRange(minCoord, maxCoord);
+  }
+  return chosen;
+}
+
+function chooseEntrySideFromExit(exitSide) {
+  if (Math.random() >= SIDE_VARIATION_CHANCE) {
+    if (exitSide === "left") return "right";
+    if (exitSide === "right") return "left";
+    if (exitSide === "top") return "bottom";
+    return "top";
+  }
+  if (exitSide === "left" || exitSide === "right") {
+    return Math.random() < 0.5 ? "top" : "bottom";
+  }
+  return Math.random() < 0.5 ? "left" : "right";
+}
+
+function redirectDuckAcrossScreen(exitSide) {
+  const areaWidth = gameArea.clientWidth;
+  const areaHeight = gameArea.clientHeight;
+  const maxX = Math.max(0, areaWidth - duck.size);
+  const maxY = Math.max(0, areaHeight - duck.size);
+  const marginX = maxX * CROSS_ENTRY_MARGIN_RATIO;
+  const marginY = maxY * CROSS_ENTRY_MARGIN_RATIO;
+  const safeYMin = marginY;
+  const safeYMax = Math.max(marginY, maxY - marginY);
+  const safeXMin = marginX;
+  const safeXMax = Math.max(marginX, maxX - marginX);
+  const entrySide = chooseEntrySideFromExit(exitSide);
+
+  let targetXMin = marginX;
+  let targetXMax = Math.max(marginX, maxX - marginX);
+  let targetYMin = marginY;
+  let targetYMax = Math.max(marginY, maxY - marginY);
+
+  if (entrySide === "left") {
+    duck.x = -duck.size;
+    duck.y = pickEntryCoord(safeYMin, safeYMax, lastEntry?.side === "left" ? lastEntry.coord : NaN);
+    targetXMin = maxX * 0.6;
+    targetXMax = Math.max(targetXMin, maxX * 0.95);
+  } else if (entrySide === "right") {
+    duck.x = areaWidth;
+    duck.y = pickEntryCoord(safeYMin, safeYMax, lastEntry?.side === "right" ? lastEntry.coord : NaN);
+    targetXMin = maxX * 0.05;
+    targetXMax = Math.max(targetXMin, maxX * 0.4);
+  } else if (entrySide === "top") {
+    duck.x = pickEntryCoord(safeXMin, safeXMax, lastEntry?.side === "top" ? lastEntry.coord : NaN);
+    duck.y = -duck.size;
+    targetYMin = maxY * 0.6;
+    targetYMax = Math.max(targetYMin, maxY * 0.95);
+  } else if (entrySide === "bottom") {
+    duck.x = pickEntryCoord(safeXMin, safeXMax, lastEntry?.side === "bottom" ? lastEntry.coord : NaN);
+    duck.y = areaHeight;
+    targetYMin = maxY * 0.05;
+    targetYMax = Math.max(targetYMin, maxY * 0.4);
+  }
+  lastEntry = {
+    side: entrySide,
+    coord: entrySide === "left" || entrySide === "right" ? duck.y : duck.x
+  };
+
+  let bestTarget = null;
+  let bestDelta = -1;
+  for (let i = 0; i < REDIRECT_CANDIDATES; i += 1) {
+    const candidateX = randomInRange(targetXMin, targetXMax);
+    const candidateY = randomInRange(targetYMin, targetYMax);
+    const candidateAngle = Math.atan2(candidateY - duck.y, candidateX - duck.x);
+    if (lastRedirectAngle === null) {
+      bestTarget = { x: candidateX, y: candidateY, angle: candidateAngle };
+      break;
+    }
+    const delta = angleDelta(candidateAngle, lastRedirectAngle);
+    if (delta > bestDelta) {
+      bestDelta = delta;
+      bestTarget = { x: candidateX, y: candidateY, angle: candidateAngle };
+      if (delta >= MIN_REDIRECT_ANGLE_DELTA) break;
+    }
+  }
+
+  const fallbackTargetX = randomInRange(targetXMin, targetXMax);
+  const fallbackTargetY = randomInRange(targetYMin, targetYMax);
+  const chosen = bestTarget || {
+    x: fallbackTargetX,
+    y: fallbackTargetY,
+    angle: Math.atan2(fallbackTargetY - duck.y, fallbackTargetX - duck.x)
+  };
+  lastRedirectAngle = chosen.angle;
+  setDuckVelocityToward(chosen.x, chosen.y, duck.speed);
 }
 
 function endGame() {
@@ -354,14 +490,20 @@ function handleDuckHit() {
   const thisRound = roundId;
   ensureGameSession()
     .then(() => registerHitForCurrentSession())
-    .then(() => {
+    .then((serverHitsCount) => {
+      totalHits = Number.isFinite(serverHitsCount) ? serverHitsCount : totalHits + 1;
       comboStreak += 1;
       const earnedPoints = calculateComboPoints();
       score += earnedPoints;
-      duck.speed += DUCK_SPEED_STEP;
+      const reachedNewWave = totalHits > 0 && totalHits % DUCKS_PER_WAVE === 0;
+      wave = Math.floor(totalHits / DUCKS_PER_WAVE) + 1;
+      hitsInWave = totalHits % DUCKS_PER_WAVE;
+      duck.speed = speedForWave(wave);
       duck.state = "flat";
       createFloatingPoints(earnedPoints);
-      messageEl.textContent = `SQUICH! +${earnedPoints} poeng (combo ${comboStreak})`;
+      messageEl.textContent = reachedNewWave
+        ? `SQUICH! +${earnedPoints} poeng. Wave ${wave}!`
+        : `SQUICH! +${earnedPoints} poeng (combo ${comboStreak})`;
       render();
 
       squishTimeoutId = setTimeout(() => {
@@ -369,7 +511,7 @@ function handleDuckHit() {
         duck.state = "whole";
         placeDuck();
         setDuckVelocity(duck.speed);
-        messageEl.textContent = "Ny and i farta!";
+        messageEl.textContent = `Ny and i farta! Wave ${wave} (${hitsInWave}/${DUCKS_PER_WAVE})`;
         render();
       }, SQUISH_DELAY_MS);
     })
@@ -415,16 +557,22 @@ function tick() {
     keepDuckSpeed();
     duck.x += duck.vx;
     duck.y += duck.vy;
-    const maxDuckX = gameArea.clientWidth - duck.size;
-    const maxDuckY = gameArea.clientHeight - duck.size;
+    const areaWidth = gameArea.clientWidth;
+    const areaHeight = gameArea.clientHeight;
+    let exitedSide = null;
 
-    if (duck.x <= 0 || duck.x >= maxDuckX) {
-      duck.x = clamp(duck.x, 0, maxDuckX);
-      duck.vx *= -1;
+    if (duck.x > areaWidth) {
+      exitedSide = "right";
+    } else if (duck.x < -duck.size) {
+      exitedSide = "left";
+    } else if (duck.y > areaHeight) {
+      exitedSide = "bottom";
+    } else if (duck.y < -duck.size) {
+      exitedSide = "top";
     }
-    if (duck.y <= 0 || duck.y >= maxDuckY) {
-      duck.y = clamp(duck.y, 0, maxDuckY);
-      duck.vy *= -1;
+
+    if (exitedSide) {
+      redirectDuckAcrossScreen(exitedSide);
     }
   }
 
@@ -443,11 +591,16 @@ function startGame() {
   running = true;
   currentGameSessionId = null;
   comboStreak = 0;
-  duck.speed = DUCK_START_SPEED;
+  totalHits = 0;
+  lastRedirectAngle = null;
+  lastEntry = null;
+  wave = 1;
+  hitsInWave = 0;
+  duck.speed = speedForWave(wave);
   duck.state = "whole";
   placeDuck();
   setDuckVelocity(duck.speed);
-  messageEl.textContent = "Trykk rett på anda for å knuse!";
+  messageEl.textContent = "Trykk rett på anda for å knuse! Wave 1 starter.";
   render();
   requestAnimationFrame(tick);
 
