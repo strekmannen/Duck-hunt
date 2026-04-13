@@ -27,7 +27,6 @@ const COMBO_STEP_BONUS = 10;
 const DUCKS_PER_WAVE = 6;
 const WAVE_SPEED_STEP = 0.45;
 const CROSS_ENTRY_MARGIN_RATIO = 0.18;
-const RESPAWN_MIN_DISTANCE_RATIO = 0.35;
 const REDIRECT_CANDIDATES = 7;
 const MIN_REDIRECT_ANGLE_DELTA = 0.7;
 const MIN_ENTRY_GAP_RATIO = 0.2;
@@ -275,40 +274,9 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function randomPosition(spriteSize) {
-  const maxX = Math.max(0, gameArea.clientWidth - spriteSize);
-  const maxY = Math.max(0, gameArea.clientHeight - spriteSize);
-  return {
-    x: Math.floor(Math.random() * (maxX + 1)),
-    y: Math.floor(Math.random() * (maxY + 1))
-  };
-}
-
-function placeDuck() {
-  const pos = randomPosition(duck.size);
-  duck.x = pos.x;
-  duck.y = pos.y;
-}
-
-function placeDuckAwayFrom(avoidX, avoidY) {
-  const areaWidth = Math.max(1, gameArea.clientWidth);
-  const areaHeight = Math.max(1, gameArea.clientHeight);
-  const minDistance = Math.hypot(areaWidth, areaHeight) * RESPAWN_MIN_DISTANCE_RATIO;
-  const avoidCenterX = avoidX + duck.size / 2;
-  const avoidCenterY = avoidY + duck.size / 2;
-
-  let chosen = randomPosition(duck.size);
-  for (let i = 0; i < 12; i += 1) {
-    const candidate = randomPosition(duck.size);
-    const candidateCenterX = candidate.x + duck.size / 2;
-    const candidateCenterY = candidate.y + duck.size / 2;
-    const distance = Math.hypot(candidateCenterX - avoidCenterX, candidateCenterY - avoidCenterY);
-    chosen = candidate;
-    if (distance >= minDistance) break;
-  }
-
-  duck.x = chosen.x;
-  duck.y = chosen.y;
+function pickRandomSide() {
+  const sides = ["left", "right", "top", "bottom"];
+  return sides[Math.floor(Math.random() * sides.length)];
 }
 
 function setDuckVelocity(speed) {
@@ -495,6 +463,10 @@ function redirectDuckAcrossScreen(exitSide) {
   setDuckVelocityToward(chosen.x, chosen.y, duck.speed);
 }
 
+function spawnDuckOutsideScreen() {
+  redirectDuckAcrossScreen(pickRandomSide());
+}
+
 function endGame() {
   running = false;
   const finalScore = score;
@@ -555,11 +527,8 @@ function handleDuckHit() {
 
       squishTimeoutId = setTimeout(() => {
         if (!running || thisRound !== roundId) return;
-        const previousDuckX = duck.x;
-        const previousDuckY = duck.y;
         duck.state = "whole";
-        placeDuckAwayFrom(previousDuckX, previousDuckY);
-        setDuckVelocity(duck.speed);
+        spawnDuckOutsideScreen();
         lastDuckSpawnAtMs = performance.now();
         messageEl.textContent = `Ny and i farta! Wave ${wave} (${hitsInWave}/${DUCKS_PER_WAVE})`;
         render();
@@ -648,8 +617,7 @@ function startGame() {
   hitsInWave = 0;
   duck.speed = speedForWave(wave);
   duck.state = "whole";
-  placeDuck();
-  setDuckVelocity(duck.speed);
+  spawnDuckOutsideScreen();
   lastDuckSpawnAtMs = performance.now();
   messageEl.textContent = "Trykk rett på anda for å knuse! Wave 1 starter.";
   render();
