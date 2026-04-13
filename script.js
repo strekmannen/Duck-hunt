@@ -327,13 +327,16 @@ function render() {
 function createFloatingPoints(points, streakLabel) {
   const floating = document.createElement("div");
   floating.className = "floating-points";
-  const streakEl = document.createElement("div");
-  streakEl.className = "floating-points-streak";
-  streakEl.textContent = streakLabel;
   const pointsEl = document.createElement("div");
   pointsEl.className = "floating-points-score";
   pointsEl.textContent = `+${points}p`;
-  floating.append(streakEl, pointsEl);
+  if (streakLabel) {
+    const streakEl = document.createElement("div");
+    streakEl.className = "floating-points-streak";
+    streakEl.textContent = streakLabel;
+    floating.append(streakEl);
+  }
+  floating.append(pointsEl);
   const left = duck.x + duck.size / 2;
   const top = duck.y - 6;
   floating.style.left = `${left}px`;
@@ -353,7 +356,9 @@ function calculateSpeedBonus(reactionMs) {
 }
 
 function calculateComboStepBonus(streak) {
-  return streak > 0 && streak % COMBO_STREAK_STEP === 0 ? COMBO_STEP_BONUS : 0;
+  if (streak <= 0 || streak % COMBO_STREAK_STEP !== 0) return 0;
+  const streakTier = Math.floor(streak / COMBO_STREAK_STEP);
+  return COMBO_STEP_BONUS * streakTier;
 }
 
 function speedForWave(waveNumber) {
@@ -522,9 +527,7 @@ function handleDuckHit() {
       hitsInWave = totalHits % DUCKS_PER_WAVE;
       duck.speed = speedForWave(wave);
       duck.state = "flat";
-      const streakLabel = comboBonus > 0
-        ? `${comboStreak}x streak +${comboBonus}p`
-        : `${comboStreak}x streak`;
+      const streakLabel = comboBonus > 0 ? `${comboStreak}x streak +${comboBonus}p` : "";
       createFloatingPoints(earnedPoints, streakLabel);
       const statusParts = [`SQUICH! +${earnedPoints} poeng`];
       if (comboBonus > 0) {
