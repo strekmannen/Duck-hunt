@@ -18,6 +18,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_jaisPo_vFHa2PZBewk40JA_wA1Glqfj";
 
 const DUCK_START_SPEED = 3.1;
 const DUCK_MIN_AXIS_SPEED = 0.75;
+const DUCK_BASE_SIZE = 84;
+const DUCK_MIN_SIZE = 46;
+const WAVE_SIZE_STEP = 3;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const BASE_POINTS_PER_HIT = 10;
@@ -30,7 +33,9 @@ const CROSS_ENTRY_MARGIN_RATIO = 0.18;
 const REDIRECT_CANDIDATES = 7;
 const MIN_REDIRECT_ANGLE_DELTA = 0.7;
 const MIN_ENTRY_GAP_RATIO = 0.2;
-const SIDE_VARIATION_CHANCE = 0.4;
+const SIDE_VARIATION_CHANCE = 0.82;
+const EDGE_LANE_WEIGHT = 12;
+const CENTER_LANE_WEIGHT = 0.12;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const SESSION_CREATE_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/create_game_session`;
@@ -39,7 +44,7 @@ const REGISTER_HIT_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/register_hit`;
 const duck = {
   x: 240,
   y: 160,
-  size: 84,
+  size: DUCK_BASE_SIZE,
   speed: DUCK_START_SPEED,
   vx: 1.2,
   vy: 1.2,
@@ -57,6 +62,7 @@ let hitsInWave = 0;
 let totalHits = 0;
 let lastRedirectAngle = null;
 let lastEntry = null;
+let lastTravelBandKey = "";
 let lastDuckSpawnAtMs = 0;
 
 function isSupabaseConfigured() {
@@ -318,6 +324,11 @@ function updateLivesIcons() {
 function render() {
   duckEl.style.left = `${duck.x}px`;
   duckEl.style.top = `${duck.y}px`;
+  const wholeSize = duck.size;
+  const flatWidth = duck.size * 1.35;
+  const flatHeight = duck.size * 0.9;
+  duckEl.style.width = duck.state === "flat" ? `${flatWidth}px` : `${wholeSize}px`;
+  duckEl.style.height = duck.state === "flat" ? `${flatHeight}px` : `${wholeSize}px`;
   scoreEl.textContent = String(score);
   waveEl.textContent = String(wave);
   updateLivesIcons();
@@ -365,6 +376,10 @@ function speedForWave(waveNumber) {
   return DUCK_START_SPEED + Math.max(0, waveNumber - 1) * WAVE_SPEED_STEP;
 }
 
+function sizeForWave(waveNumber) {
+  return Math.max(DUCK_MIN_SIZE, DUCK_BASE_SIZE - Math.max(0, waveNumber - 1) * WAVE_SIZE_STEP);
+}
+
 function randomInRange(min, max) {
   return min + Math.random() * (max - min);
 }
@@ -387,6 +402,38 @@ function pickEntryCoord(minCoord, maxCoord, lastCoord) {
   return chosen;
 }
 
+function pickTravelBand(axisMax, axisTag) {
+  const bands = [
+    { key: `${axisTag}-low`, min: 0.05, max: 0.28, edge: true },
+    { key: `${axisTag}-mid`, min: 0.36, max: 0.64, edge: false },
+    { key: `${axisTag}-high`, min: 0.72, max: 0.95, edge: true }
+  ];
+
+  let totalWeight = 0;
+  const weighted = bands.map((band) => {
+    let weight = band.edge ? EDGE_LANE_WEIGHT : CENTER_LANE_WEIGHT;
+    if (band.key === lastTravelBandKey) weight *= 0.25;
+    totalWeight += weight;
+    return { band, weight };
+  });
+
+  let pick = Math.random() * totalWeight;
+  let chosen = weighted[0].band;
+  for (const entry of weighted) {
+    pick -= entry.weight;
+    if (pick <= 0) {
+      chosen = entry.band;
+      break;
+    }
+  }
+
+  lastTravelBandKey = chosen.key;
+  return [
+    axisMax * chosen.min,
+    Math.max(axisMax * chosen.min, axisMax * chosen.max)
+  ];
+}
+
 function chooseEntrySideFromExit(exitSide) {
   if (Math.random() >= SIDE_VARIATION_CHANCE) {
     if (exitSide === "left") return "right";
@@ -407,10 +454,6 @@ function redirectDuckAcrossScreen(exitSide) {
   const maxY = Math.max(0, areaHeight - duck.size);
   const marginX = maxX * CROSS_ENTRY_MARGIN_RATIO;
   const marginY = maxY * CROSS_ENTRY_MARGIN_RATIO;
-  const safeYMin = marginY;
-  const safeYMax = Math.max(marginY, maxY - marginY);
-  const safeXMin = marginX;
-  const safeXMax = Math.max(marginX, maxX - marginX);
   const entrySide = chooseEntrySideFromExit(exitSide);
 
   let targetXMin = marginX;
@@ -419,25 +462,37 @@ function redirectDuckAcrossScreen(exitSide) {
   let targetYMax = Math.max(marginY, maxY - marginY);
 
   if (entrySide === "left") {
+    const [laneYMin, laneYMax] = pickTravelBand(maxY, "y");
     duck.x = -duck.size;
-    duck.y = pickEntryCoord(safeYMin, safeYMax, lastEntry?.side === "left" ? lastEntry.coord : NaN);
+    duck.y = pickEntryCoord(laneYMin, laneYMax, lastEntry?.side === "left" ? lastEntry.coord : NaN);
     targetXMin = maxX * 0.6;
     targetXMax = Math.max(targetXMin, maxX * 0.95);
+    targetYMin = laneYMin;
+    targetYMax = laneYMax;
   } else if (entrySide === "right") {
+    const [laneYMin, laneYMax] = pickTravelBand(maxY, "y");
     duck.x = areaWidth;
-    duck.y = pickEntryCoord(safeYMin, safeYMax, lastEntry?.side === "right" ? lastEntry.coord : NaN);
+    duck.y = pickEntryCoord(laneYMin, laneYMax, lastEntry?.side === "right" ? lastEntry.coord : NaN);
     targetXMin = maxX * 0.05;
     targetXMax = Math.max(targetXMin, maxX * 0.4);
+    targetYMin = laneYMin;
+    targetYMax = laneYMax;
   } else if (entrySide === "top") {
-    duck.x = pickEntryCoord(safeXMin, safeXMax, lastEntry?.side === "top" ? lastEntry.coord : NaN);
+    const [laneXMin, laneXMax] = pickTravelBand(maxX, "x");
+    duck.x = pickEntryCoord(laneXMin, laneXMax, lastEntry?.side === "top" ? lastEntry.coord : NaN);
     duck.y = -duck.size;
     targetYMin = maxY * 0.6;
     targetYMax = Math.max(targetYMin, maxY * 0.95);
+    targetXMin = laneXMin;
+    targetXMax = laneXMax;
   } else if (entrySide === "bottom") {
-    duck.x = pickEntryCoord(safeXMin, safeXMax, lastEntry?.side === "bottom" ? lastEntry.coord : NaN);
+    const [laneXMin, laneXMax] = pickTravelBand(maxX, "x");
+    duck.x = pickEntryCoord(laneXMin, laneXMax, lastEntry?.side === "bottom" ? lastEntry.coord : NaN);
     duck.y = areaHeight;
     targetYMin = maxY * 0.05;
     targetYMax = Math.max(targetYMin, maxY * 0.4);
+    targetXMin = laneXMin;
+    targetXMax = laneXMax;
   }
   lastEntry = {
     side: entrySide,
@@ -526,6 +581,7 @@ function handleDuckHit() {
       wave = Math.floor(totalHits / DUCKS_PER_WAVE) + 1;
       hitsInWave = totalHits % DUCKS_PER_WAVE;
       duck.speed = speedForWave(wave);
+      duck.size = sizeForWave(wave);
       duck.state = "flat";
       const streakLabel = comboBonus > 0 ? `${comboStreak}x streak +${comboBonus}p` : "";
       createFloatingPoints(earnedPoints, streakLabel);
@@ -629,9 +685,11 @@ function startGame() {
   totalHits = 0;
   lastRedirectAngle = null;
   lastEntry = null;
+  lastTravelBandKey = "";
   wave = 1;
   hitsInWave = 0;
   duck.speed = speedForWave(wave);
+  duck.size = sizeForWave(wave);
   duck.state = "whole";
   spawnDuckOutsideScreen();
   lastDuckSpawnAtMs = performance.now();
