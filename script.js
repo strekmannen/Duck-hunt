@@ -20,6 +20,8 @@ const DUCK_SPEED_STEP = 0.2625;
 const DUCK_MIN_AXIS_SPEED = 0.75;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
+const BASE_POINTS_PER_HIT = 10;
+const COMBO_BONUS_STEP = 2;
 const PLAYER_PROFILE_KEY = "badeand_player_profile_v1";
 const HIGHSCORE_LIMIT = 10;
 const SESSION_CREATE_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/create_game_session`;
@@ -40,6 +42,7 @@ let running = true;
 let roundId = 0;
 let squishTimeoutId = null;
 let currentGameSessionId = null;
+let comboStreak = 0;
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -300,6 +303,24 @@ function render() {
   applyDuckSprite();
 }
 
+function createFloatingPoints(points) {
+  const floating = document.createElement("div");
+  floating.className = "floating-points";
+  floating.textContent = `+${points}`;
+  const left = duck.x + duck.size / 2;
+  const top = duck.y - 6;
+  floating.style.left = `${left}px`;
+  floating.style.top = `${top}px`;
+  gameArea.appendChild(floating);
+  setTimeout(() => {
+    floating.remove();
+  }, 850);
+}
+
+function calculateComboPoints() {
+  return BASE_POINTS_PER_HIT + Math.max(0, comboStreak - 1) * COMBO_BONUS_STEP;
+}
+
 function endGame() {
   running = false;
   const finalScore = score;
@@ -333,11 +354,14 @@ function handleDuckHit() {
   const thisRound = roundId;
   ensureGameSession()
     .then(() => registerHitForCurrentSession())
-    .then((serverScore) => {
-      score = serverScore;
+    .then(() => {
+      comboStreak += 1;
+      const earnedPoints = calculateComboPoints();
+      score += earnedPoints;
       duck.speed += DUCK_SPEED_STEP;
       duck.state = "flat";
-      messageEl.textContent = "SQUICH! Anda ble flat!";
+      createFloatingPoints(earnedPoints);
+      messageEl.textContent = `SQUICH! +${earnedPoints} poeng (combo ${comboStreak})`;
       render();
 
       squishTimeoutId = setTimeout(() => {
@@ -373,6 +397,7 @@ function handleDuckHit() {
 function handleMiss() {
   if (!running || duck.state !== "whole") return;
   lives -= 1;
+  comboStreak = 0;
   if (lives <= 0) {
     lives = 0;
     render();
@@ -417,6 +442,7 @@ function startGame() {
   lives = START_LIVES;
   running = true;
   currentGameSessionId = null;
+  comboStreak = 0;
   duck.speed = DUCK_START_SPEED;
   duck.state = "whole";
   placeDuck();

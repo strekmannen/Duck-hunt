@@ -167,9 +167,31 @@ h1 {
   animation: none;
 }
 
+.floating-points {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  color: var(--neon-yellow);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 230, 109, 0.85);
+  animation: float-up 0.85s ease-out forwards;
+  z-index: 3;
+}
+
 @keyframes bob {
   from { transform: translateY(-1px); }
   to { transform: translateY(2px); }
+}
+
+@keyframes float-up {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -120%);
+  }
 }
 
 .message {
