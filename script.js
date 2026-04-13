@@ -21,7 +21,9 @@ const DUCK_MIN_AXIS_SPEED = 0.75;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const BASE_POINTS_PER_HIT = 10;
-const COMBO_BONUS_STEP = 2;
+const MAX_SPEED_BONUS = 10;
+const COMBO_STREAK_STEP = 5;
+const COMBO_STEP_BONUS = 10;
 const DUCKS_PER_WAVE = 6;
 const WAVE_SPEED_STEP = 0.45;
 const CROSS_ENTRY_MARGIN_RATIO = 0.18;
@@ -55,6 +57,7 @@ let hitsInWave = 0;
 let totalHits = 0;
 let lastRedirectAngle = null;
 let lastEntry = null;
+let lastDuckSpawnAtMs = 0;
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -345,8 +348,17 @@ function createFloatingPoints(points) {
   }, 850);
 }
 
-function calculateComboPoints() {
-  return BASE_POINTS_PER_HIT + Math.max(0, comboStreak - 1) * COMBO_BONUS_STEP;
+function calculateSpeedBonus(reactionMs) {
+  if (reactionMs <= 450) return MAX_SPEED_BONUS;
+  if (reactionMs <= 700) return 8;
+  if (reactionMs <= 1000) return 6;
+  if (reactionMs <= 1400) return 4;
+  if (reactionMs <= 1800) return 2;
+  return 0;
+}
+
+function calculateComboStepBonus(streak) {
+  return streak > 0 && streak % COMBO_STREAK_STEP === 0 ? COMBO_STEP_BONUS : 0;
 }
 
 function speedForWave(waveNumber) {
@@ -501,7 +513,10 @@ function handleDuckHit() {
     .then((serverHitsCount) => {
       totalHits = Number.isFinite(serverHitsCount) ? serverHitsCount : totalHits + 1;
       comboStreak += 1;
-      const earnedPoints = calculateComboPoints();
+      const reactionMs = Math.max(0, performance.now() - lastDuckSpawnAtMs);
+      const speedBonus = calculateSpeedBonus(reactionMs);
+      const comboBonus = calculateComboStepBonus(comboStreak);
+      const earnedPoints = BASE_POINTS_PER_HIT + speedBonus + comboBonus;
       score += earnedPoints;
       const reachedNewWave = totalHits > 0 && totalHits % DUCKS_PER_WAVE === 0;
       wave = Math.floor(totalHits / DUCKS_PER_WAVE) + 1;
@@ -511,7 +526,9 @@ function handleDuckHit() {
       createFloatingPoints(earnedPoints);
       messageEl.textContent = reachedNewWave
         ? `SQUICH! +${earnedPoints} poeng. Wave ${wave}!`
-        : `SQUICH! +${earnedPoints} poeng (combo ${comboStreak})`;
+        : comboBonus > 0
+          ? `SQUICH! +${earnedPoints} poeng! Combo-bonus for ${comboStreak} treff pa rad!`
+          : `SQUICH! +${earnedPoints} poeng (reaksjon ${Math.round(reactionMs)}ms)`;
       render();
 
       squishTimeoutId = setTimeout(() => {
@@ -519,6 +536,7 @@ function handleDuckHit() {
         duck.state = "whole";
         placeDuck();
         setDuckVelocity(duck.speed);
+        lastDuckSpawnAtMs = performance.now();
         messageEl.textContent = `Ny and i farta! Wave ${wave} (${hitsInWave}/${DUCKS_PER_WAVE})`;
         render();
       }, SQUISH_DELAY_MS);
@@ -608,6 +626,7 @@ function startGame() {
   duck.state = "whole";
   placeDuck();
   setDuckVelocity(duck.speed);
+  lastDuckSpawnAtMs = performance.now();
   messageEl.textContent = "Trykk rett på anda for å knuse! Wave 1 starter.";
   render();
   requestAnimationFrame(tick);

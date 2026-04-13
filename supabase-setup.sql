@@ -88,6 +88,7 @@ declare
   v_elapsed_seconds numeric;
   v_max_allowed_score integer;
   v_server_score integer;
+  v_max_client_score integer;
 begin
   if p_session_id is null then
     raise exception 'game session missing or expired';
@@ -125,12 +126,15 @@ begin
     raise exception 'score exceeds allowed pace';
   end if;
 
-  -- Combojeger score is client-visible points. For anti-cheat we bound it by hit count:
-  -- minimum points for n hits is n; maximum (perfect combo) is n^2 + 9n.
+  -- Combo score bounds:
+  -- base: 10 per hit
+  -- speed bonus: max +10 per hit
+  -- combo bonus: +10 for each 5-hit streak step
   if p_client_score < v_hits_count then
     raise exception 'client score below hit count';
   end if;
-  if p_client_score > (v_hits_count * v_hits_count) + (9 * v_hits_count) then
+  v_max_client_score := (v_hits_count * 20) + (floor(v_hits_count / 5.0)::integer * 10);
+  if p_client_score > v_max_client_score then
     raise exception 'client score exceeds combo cap';
   end if;
 
