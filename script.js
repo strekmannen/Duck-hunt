@@ -324,10 +324,16 @@ function render() {
   applyDuckSprite();
 }
 
-function createFloatingPoints(points) {
+function createFloatingPoints(points, streakLabel) {
   const floating = document.createElement("div");
   floating.className = "floating-points";
-  floating.textContent = `+${points}`;
+  const streakEl = document.createElement("div");
+  streakEl.className = "floating-points-streak";
+  streakEl.textContent = streakLabel;
+  const pointsEl = document.createElement("div");
+  pointsEl.className = "floating-points-score";
+  pointsEl.textContent = `+${points}p`;
+  floating.append(streakEl, pointsEl);
   const left = duck.x + duck.size / 2;
   const top = duck.y - 6;
   floating.style.left = `${left}px`;
@@ -516,7 +522,10 @@ function handleDuckHit() {
       hitsInWave = totalHits % DUCKS_PER_WAVE;
       duck.speed = speedForWave(wave);
       duck.state = "flat";
-      createFloatingPoints(earnedPoints);
+      const streakLabel = comboBonus > 0
+        ? `${comboStreak}x streak +${comboBonus}p`
+        : `${comboStreak}x streak`;
+      createFloatingPoints(earnedPoints, streakLabel);
       const statusParts = [`SQUICH! +${earnedPoints} poeng`];
       if (comboBonus > 0) {
         statusParts.push(`${comboStreak}x streak +${comboBonus}p`);

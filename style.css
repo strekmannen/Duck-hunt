@@ -177,13 +177,26 @@ h1 {
 
 .floating-points {
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -52%);
   pointer-events: none;
-  color: var(--neon-yellow);
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
   font-weight: 700;
-  text-shadow: 0 0 8px rgba(255, 230, 109, 0.85);
   animation: float-up 0.85s ease-out forwards;
   z-index: 3;
+}
+
+.floating-points-streak {
+  color: var(--neon-pink);
+  font-size: 0.82rem;
+  text-shadow: 0 0 8px rgba(255, 60, 172, 0.75);
+}
+
+.floating-points-score {
+  color: var(--neon-yellow);
+  font-size: 1rem;
+  text-shadow: 0 0 8px rgba(255, 230, 109, 0.85);
 }
 
 @keyframes bob {
