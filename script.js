@@ -64,6 +64,7 @@ let lastRedirectAngle = null;
 let lastEntry = null;
 let lastTravelBandKey = "";
 let lastDuckSpawnAtMs = 0;
+let animationFrameId = null;
 
 function isSupabaseConfigured() {
   return SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
@@ -642,7 +643,10 @@ function handleMiss() {
 }
 
 function tick() {
-  if (!running) return;
+  if (!running) {
+    animationFrameId = null;
+    return;
+  }
 
   if (duck.state === "whole") {
     keepDuckSpeed();
@@ -668,11 +672,15 @@ function tick() {
   }
 
   render();
-  requestAnimationFrame(tick);
+  animationFrameId = requestAnimationFrame(tick);
 }
 
 function startGame() {
   roundId += 1;
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
   if (squishTimeoutId) {
     clearTimeout(squishTimeoutId);
     squishTimeoutId = null;
@@ -695,7 +703,7 @@ function startGame() {
   lastDuckSpawnAtMs = performance.now();
   messageEl.textContent = "Trykk rett på anda for å knuse! Wave 1 starter.";
   render();
-  requestAnimationFrame(tick);
+  animationFrameId = requestAnimationFrame(tick);
 
   if (isSupabaseConfigured()) {
     ensureGameSession()
