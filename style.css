@@ -50,11 +50,16 @@ h1 {
 .hud {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
   font-size: 1rem;
+}
+
+.status-column {
+  display: grid;
+  gap: 0.3rem;
 }
 
 .hud-actions {
@@ -288,9 +293,9 @@ h1 {
     font-size: 0.95rem;
   }
 
-  .hud > div {
-    flex: 1 1 45%;
-    min-width: 0;
+  .status-column {
+    flex: 1 1 100%;
+    gap: 0.25rem;
   }
 
   .hud-actions {
