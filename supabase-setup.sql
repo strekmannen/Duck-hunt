@@ -128,12 +128,12 @@ begin
 
   -- Combo score bounds:
   -- base: 10 per hit
-  -- speed bonus: max +10 per hit
+  -- speed bonus: max +24 per hit
   -- combo bonus: +10 for each 5-hit streak step
   if p_client_score < v_hits_count then
     raise exception 'client score below hit count';
   end if;
-  v_max_client_score := (v_hits_count * 20) + (floor(v_hits_count / 5.0)::integer * 10);
+  v_max_client_score := (v_hits_count * 34) + (floor(v_hits_count / 5.0)::integer * 10);
   if p_client_score > v_max_client_score then
     raise exception 'client score exceeds combo cap';
   end if;

@@ -21,7 +21,7 @@ const DUCK_MIN_AXIS_SPEED = 0.75;
 const START_LIVES = 3;
 const SQUISH_DELAY_MS = 1000;
 const BASE_POINTS_PER_HIT = 10;
-const MAX_SPEED_BONUS = 10;
+const MAX_SPEED_BONUS = 24;
 const COMBO_STREAK_STEP = 5;
 const COMBO_STEP_BONUS = 10;
 const DUCKS_PER_WAVE = 6;
@@ -339,12 +339,11 @@ function createFloatingPoints(points) {
 }
 
 function calculateSpeedBonus(reactionMs) {
-  if (reactionMs <= 450) return MAX_SPEED_BONUS;
-  if (reactionMs <= 700) return 8;
-  if (reactionMs <= 1000) return 6;
-  if (reactionMs <= 1400) return 4;
-  if (reactionMs <= 1800) return 2;
-  return 0;
+  const maxRewardWindowMs = 1200;
+  if (reactionMs <= 0) return MAX_SPEED_BONUS;
+  if (reactionMs >= maxRewardWindowMs) return 0;
+  const normalized = 1 - reactionMs / maxRewardWindowMs;
+  return Math.max(0, Math.min(MAX_SPEED_BONUS, Math.round(normalized * MAX_SPEED_BONUS)));
 }
 
 function calculateComboStepBonus(streak) {
