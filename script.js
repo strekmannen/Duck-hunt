@@ -355,7 +355,7 @@ function createFloatingPoints(points, streakLabel) {
   gameArea.appendChild(floating);
   setTimeout(() => {
     floating.remove();
-  }, 850);
+  }, 1250);
 }
 
 function calculateSpeedBonus(reactionMs) {
@@ -536,7 +536,7 @@ function endGame() {
   running = false;
   const finalScore = score;
   if (!areProfileFieldsValid()) {
-    messageEl.textContent = `Game over! Du knuste ${finalScore} and(er). Fyll inn fornavn, etternavn og e-post for highscore.`;
+    messageEl.textContent = `Game over! Du fikk ${finalScore} poeng. Fyll inn fornavn, etternavn og e-post for highscore.`;
     return;
   }
 
@@ -558,7 +558,7 @@ function endGame() {
       messageEl.textContent = "Resultatet kunne ikke lagres akkurat nå. Prøv igjen neste runde.";
       return;
     }
-    messageEl.textContent = `Game over! Du knuste ${finalScore} and(er). Resultat lagret i highscore.`;
+    messageEl.textContent = `Game over! Du fikk ${finalScore} poeng. Resultat lagret i highscore.`;
   });
 }
 

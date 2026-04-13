@@ -183,7 +183,7 @@ h1 {
   justify-items: center;
   gap: 0.1rem;
   font-weight: 700;
-  animation: float-up 0.85s ease-out forwards;
+  animation: float-up 1.25s ease-out forwards;
   z-index: 3;
 }
 
