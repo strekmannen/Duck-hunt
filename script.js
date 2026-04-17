@@ -586,7 +586,9 @@ function handleDuckHit() {
   ensureGameSession()
     .then(() => registerHitForCurrentSession())
     .then((serverHitsCount) => {
-      totalHits = Number.isFinite(serverHitsCount) ? serverHitsCount : totalHits + 1;
+      // Keep wave progression monotonic even if backend session count restarts.
+      const nextHitsFromServer = Number.isFinite(serverHitsCount) ? serverHitsCount : totalHits + 1;
+      totalHits = Math.max(totalHits + 1, nextHitsFromServer);
       comboStreak += 1;
       const reactionMs = Math.max(0, performance.now() - lastDuckSpawnAtMs);
       const speedBonus = calculateSpeedBonus(reactionMs);
