@@ -230,51 +230,58 @@ async function saveScoreForCurrentPlayer() {
     lastName.length > 0 &&
     isValidEmail(email);
   if (!isValid) return { saved: false, reason: "missing_profile" };
-  if (!currentGameSessionId) return { saved: false, reason: "missing_session" };
-
   const displayName = toDisplayName(firstName, lastName);
-
-  if (isSupabaseConfigured()) {
-    try {
-      const emailHash = await sha256(email);
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          p_session_id: currentGameSessionId,
-          p_email_hash: emailHash,
-          p_display_name: displayName,
-          p_full_name: fullName,
-          p_email: email,
-          p_client_score: score
-        })
-      });
-      if (!response.ok) {
-        const details = await response.text();
-        throw new Error(`submit_score failed: ${details}`);
-      }
-      await loadAndRenderHighscores();
-      return { saved: true, scope: "global" };
-    } catch (error) {
-      console.warn("Global score save failed.", error);
-      const msg = String(error.message || "");
-      if (msg.includes("score exceeds allowed pace")) {
-        return { saved: false, reason: "score_rejected" };
-      }
-      if (msg.includes("submit_score(")) {
-        return { saved: false, reason: "sql_not_updated" };
-      }
-      if (msg.includes("game session missing or expired")) {
-        return { saved: false, reason: "missing_session" };
-      }
-      return { saved: false, reason: "global_save_failed" };
-    }
+  if (!isSupabaseConfigured()) {
+    return { saved: false, reason: "global_not_configured" };
   }
-  return { saved: false, reason: "global_not_configured" };
+
+  try {
+    if (!currentGameSessionId) {
+      currentGameSessionId = await createGameSession();
+    }
+  } catch (error) {
+    const msg = String(error?.message || "");
+    return { saved: false, reason: "missing_session", details: msg };
+  }
+
+  try {
+    const emailHash = await sha256(email);
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        p_session_id: currentGameSessionId,
+        p_email_hash: emailHash,
+        p_display_name: displayName,
+        p_full_name: fullName,
+        p_email: email,
+        p_client_score: score
+      })
+    });
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`submit_score failed: ${details}`);
+    }
+    await loadAndRenderHighscores();
+    return { saved: true, scope: "global" };
+  } catch (error) {
+    console.warn("Global score save failed.", error);
+    const msg = String(error.message || "");
+    if (msg.includes("score exceeds allowed pace")) {
+      return { saved: false, reason: "score_rejected" };
+    }
+    if (msg.includes("submit_score(")) {
+      return { saved: false, reason: "sql_not_updated", details: msg };
+    }
+    if (msg.includes("game session missing or expired")) {
+      return { saved: false, reason: "missing_session", details: msg };
+    }
+    return { saved: false, reason: "global_save_failed", details: msg };
+  }
 }
 
 function clamp(value, min, max) {
@@ -545,7 +552,7 @@ function endGame() {
   saveScoreForCurrentPlayer().then((result) => {
     if (!result.saved) {
       if (result.reason === "missing_session") {
-        messageEl.textContent = "Resultat ble ikke lagret: spilltoken mangler/utlopt.";
+        messageEl.textContent = "Resultat ble ikke lagret: mangler gyldig spillsesjon i Supabase.";
         return;
       }
       if (result.reason === "score_rejected") {
@@ -554,6 +561,14 @@ function endGame() {
       }
       if (result.reason === "sql_not_updated") {
         messageEl.textContent = "Resultatet ble ikke lagret: oppdater Supabase SQL (submit_score-signatur).";
+        return;
+      }
+      if (result.reason === "global_not_configured") {
+        messageEl.textContent = "Resultatet ble ikke lagret: Supabase er ikke konfigurert i frontend.";
+        return;
+      }
+      if (result.details) {
+        messageEl.textContent = `Resultatet ble ikke lagret i Supabase: ${result.details.slice(0, 140)}`;
         return;
       }
       messageEl.textContent = "Resultatet kunne ikke lagres akkurat nå. Prøv igjen neste runde.";
